@@ -1,0 +1,410 @@
+import makeWASocket, {
+  DisconnectReason,
+  useMultiFileAuthState,
+  WASocket,
+  proto,
+  fetchLatestBaileysVersion,
+  Browsers
+} from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import pino from 'pino';
+import qrcode from 'qrcode-terminal';
+import path from 'path';
+import fs from 'fs';
+import config from '../config';
+import { setupConnectionHandler } from '../handlers/connection.handler';
+import { setupMessageHandler } from '../handlers/message.handler';
+
+/**
+ * Get MIME type from file extension
+ */
+function getMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'mp4': 'video/mp4',
+    'avi': 'video/avi',
+    'mov': 'video/quicktime',
+    'mp3': 'audio/mpeg',
+    'ogg': 'audio/ogg',
+    'wav': 'audio/wav',
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'txt': 'text/plain',
+    'zip': 'application/zip'
+  };
+  return mimeTypes[ext || ''] || 'application/octet-stream';
+}
+
+/**
+ * Clear session data
+ */
+function clearSession(authPath: string, logger: pino.Logger): void {
+  try {
+    if (fs.existsSync(authPath)) {
+      fs.rmSync(authPath, { recursive: true, force: true });
+      logger.info('Session data cleared');
+    }
+  } catch (error) {
+    logger.error(error, 'Failed to clear session data');
+  }
+}
+
+export class WhatsAppService {
+  private socket: WASocket | null = null;
+  private logger: pino.Logger;
+  private authPath: string;
+
+  constructor() {
+    this.logger = pino({
+      level: config.logLevel,
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true
+        }
+      }
+    });
+
+    this.authPath = path.join(process.cwd(), config.sessionName);
+  }
+
+  /**
+   * Initialize and connect to WhatsApp
+   */
+  async connect(): Promise<void> {
+    try {
+      // Load authentication state
+      const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
+
+      // Get latest WhatsApp version
+      const { version } = await fetchLatestBaileysVersion();
+
+      this.logger.info('Connecting to WhatsApp...');
+
+      // Use a more compatible browser configuration
+      // Try Ubuntu Chrome instead of Mac
+      const browserConfig = Browsers.ubuntu('Chrome');
+
+      // Create socket connection with retry configuration
+      this.socket = makeWASocket({
+        version,
+        auth: state,
+        printQRInTerminal: false, // We'll handle QR printing manually
+        logger: this.logger.child({ class: 'baileys' }),
+        browser: browserConfig,
+        syncFullHistory: config.syncFullHistory,
+        markOnlineOnConnect: true,
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
+        retryRequestDelayMs: 500,
+        maxMsgRetryCount: 5,
+        fireInitQueries: true,
+        shouldIgnoreJid: (jid) => {
+          // Ignore broadcast and status messages
+          return jid.endsWith('@broadcast') || jid.endsWith('@newsletter');
+        }
+      });
+
+      // Setup event handlers
+      this.setupEventHandlers(saveCreds);
+
+      // Handle QR code or pairing code
+      await this.handleAuthentication();
+
+      this.logger.info('Connection initiated');
+
+    } catch (error: any) {
+      this.logger.error({
+        error: error?.message || error,
+        stack: error?.stack
+      }, 'Failed to connect to WhatsApp');
+
+      // Check for common issues
+      if (error?.message?.includes('WebSocket')) {
+        this.logger.warn('WebSocket connection failed. Check your internet connection and firewall settings.');
+        this.logger.warn('WhatsApp servers may be temporarily unavailable. Try again in a few moments.');
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Setup all event handlers
+   */
+  private setupEventHandlers(saveCreds: () => Promise<void>): void {
+    if (!this.socket) return;
+
+    // Connection updates
+    setupConnectionHandler(
+      this.socket,
+      this.logger,
+      saveCreds,
+      () => clearSession(this.authPath, this.logger),
+      () => this.connect()
+    );
+
+    // Message updates
+    setupMessageHandler(this.socket, this.logger);
+
+    // Save credentials on update
+    this.socket.ev.on('creds.update', saveCreds);
+  }
+
+  /**
+   * Handle authentication (QR or Pairing Code)
+   */
+  private async handleAuthentication(): Promise<void> {
+    if (!this.socket) return;
+
+    if (config.authMethod === 'pairing' && config.phoneNumber) {
+      // Use pairing code authentication
+      const result = await this.socket.requestPairingCode(config.phoneNumber);
+      this.logger.info(`Pairing code: ${result}`);
+      console.log(`\n📱 Pairing Code: ${result}\n`);
+    } else if (config.printQRInTerminal) {
+      // Print QR code to terminal
+      this.socket.ev.on('connection.update', async (update) => {
+        const { qr } = update;
+        if (qr) {
+          qrcode.generate(qr, { small: true }, (qrcode) => {
+            console.log('\n📱 Scan this QR code with WhatsApp:\n');
+            console.log(qrcode);
+            console.log('\n');
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * Send a text message
+   */
+  async sendMessage(jid: string, text: string, options?: {
+    quoted?: proto.IWebMessageInfo;
+    mentions?: string[];
+  }): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    const message: any = {
+      text,
+      mentions: options?.mentions
+    };
+
+    if (options?.quoted) {
+      message.quoted = options.quoted;
+    }
+
+    await this.socket.sendMessage(jid, message);
+  }
+
+  /**
+   * Send an image message
+   */
+  async sendImage(jid: string, image: Buffer | string, caption?: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      image: typeof image === 'string' ? { url: image } : image,
+      caption
+    });
+  }
+
+  /**
+   * Send a video message
+   */
+  async sendVideo(jid: string, video: Buffer | string, caption?: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      video: typeof video === 'string' ? { url: video } : video,
+      caption
+    });
+  }
+
+  /**
+   * Send an audio message
+   */
+  async sendAudio(jid: string, audio: Buffer | string, ptt: boolean = false): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      audio: typeof audio === 'string' ? { url: audio } : audio,
+      ptt,
+      mimetype: 'audio/ogg; codecs=opus'
+    });
+  }
+
+  /**
+   * Send a document message
+   */
+  async sendDocument(jid: string, document: Buffer | string, fileName?: string, caption?: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      document: typeof document === 'string' ? { url: document } : document,
+      fileName,
+      caption,
+      mimetype: fileName ? getMimeType(fileName) : 'application/octet-stream'
+    });
+  }
+
+  /**
+   * Send a location message
+   */
+  async sendLocation(jid: string, latitude: number, longitude: number, name?: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      location: {
+        degreesLatitude: latitude,
+        degreesLongitude: longitude,
+        name
+      }
+    });
+  }
+
+  /**
+   * Send a contact message
+   */
+  async sendContact(jid: string, phoneNumber: string, displayName: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      contacts: {
+        displayName,
+        contacts: [{
+          displayName,
+          vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${displayName}\nTEL;type=CELL;type=VOICE;waid=${phoneNumber.replace(/[^0-9]/g, '')}:${phoneNumber}\nEND:VCARD`
+        }]
+      }
+    });
+  }
+
+  /**
+   * Send a poll message
+   */
+  async sendPoll(jid: string, name: string, values: string[], multipleAnswers: boolean = false): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      poll: {
+        name,
+        values,
+        selectableCount: multipleAnswers ? values.length : 1
+      }
+    });
+  }
+
+  /**
+   * Send a reaction to a message
+   */
+  async sendReaction(jid: string, key: proto.IMessageKey, reaction: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      react: {
+        text: reaction,
+        key
+      }
+    });
+  }
+
+  /**
+   * Reply to a message
+   */
+  async reply(jid: string, text: string, quoted: proto.IWebMessageInfo): Promise<void> {
+    await this.sendMessage(jid, text, { quoted });
+  }
+
+  /**
+   * Delete a message
+   */
+  async deleteMessage(jid: string, key: proto.IMessageKey): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, { delete: key });
+  }
+
+  /**
+   * Edit a message
+   */
+  async editMessage(jid: string, key: proto.IMessageKey, newText: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendMessage(jid, {
+      text: newText,
+      edit: key
+    });
+  }
+
+  /**
+   * Send presence update (typing, recording, online, offline)
+   */
+  async sendPresenceUpdate(type: 'available' | 'unavailable' | 'composing' | 'recording' | 'paused', jid?: string): Promise<void> {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+
+    await this.socket.sendPresenceUpdate(type, jid);
+  }
+
+  /**
+   * Get socket instance
+   */
+  getSocket(): WASocket | null {
+    return this.socket;
+  }
+
+  /**
+   * Check if connected
+   */
+  isConnected(): boolean {
+    return this.socket !== null;
+  }
+
+  /**
+   * Disconnect from WhatsApp
+   */
+  async disconnect(): Promise<void> {
+    if (this.socket) {
+      this.socket.end(undefined);
+      this.socket = null;
+      this.logger.info('Disconnected from WhatsApp');
+    }
+  }
+}
+
+// Export singleton instance
+export const whatsappService = new WhatsAppService();
+export default whatsappService;
