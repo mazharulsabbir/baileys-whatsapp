@@ -106,11 +106,24 @@ async function handleMessage(
   const isGroup = chatId ? isJidGroup(chatId) : false;
   const fromMe = message.key.fromMe;
   const senderId = fromMe ? 'me' : (message.key.participant || message.key.remoteJid);
+  const senderName = message.pushName || 'Unknown';
+
+  let groupName: string | undefined;
+  if (isGroup && chatId) {
+    try {
+      const groupMetadata = await socket.groupMetadata(chatId);
+      groupName = groupMetadata.subject;
+    } catch (err) {
+      logger.debug({ err, chatId }, 'Failed to fetch group metadata');
+    }
+  }
 
   logger.info({
     direction: fromMe ? 'outgoing' : 'incoming',
     from: senderId,
+    senderName,
     chat: chatId,
+    ...(groupName && { groupName }),
     isGroup,
     type: getMessageType(message)
   }, fromMe ? 'Outgoing message' : 'Incoming message');
