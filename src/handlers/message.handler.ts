@@ -119,6 +119,8 @@ async function handleMessage(
   }
 
   logger.info({
+    messageId: message.key.id,
+    timestamp: message.messageTimestamp,
     direction: fromMe ? 'outgoing' : 'incoming',
     from: senderId,
     senderName,
