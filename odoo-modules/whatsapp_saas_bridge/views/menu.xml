@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_saas_whatsapp_root"
+              name="WhatsApp SaaS"
+              sequence="80"
+              groups="whatsapp_saas_bridge.group_saas_whatsapp_user,base.group_system"/>
+
+    <menuitem id="menu_saas_whatsapp_connector"
+              name="Connectors"
+              parent="menu_saas_whatsapp_root"
+              action="action_saas_whatsapp_connector"
+              sequence="10"/>
+</odoo>

@@ -15,7 +15,10 @@ export function setupConnectionHandler(
   logger: pino.Logger,
   saveCreds: () => Promise<void>,
   clearSessionCallback?: () => void,
-  reconnectCallback?: () => Promise<void>
+  reconnectCallback?: () => Promise<void>,
+  onQr?: (qr: string) => void,
+  autoReconnectEnabled: boolean = config.autoReconnect,
+  onConnectionOpen?: () => void
 ): void {
   let restartRequiredCount = 0;
   const MAX_RESTART_ATTEMPTS = 2;
@@ -26,6 +29,7 @@ export function setupConnectionHandler(
     // Handle QR code (if not using pairing code)
     if (qr) {
       logger.info('QR code received - waiting for scan...');
+      onQr?.(qr);
       return;
     }
 
@@ -53,7 +57,7 @@ export function setupConnectionHandler(
       
       const shouldReconnect = shouldReconnectOnDisconnect(statusCode);
 
-      if (shouldReconnect && config.autoReconnect) {
+      if (shouldReconnect && autoReconnectEnabled) {
         logger.info('Reconnecting...');
         if (reconnectCallback) {
           reconnectCallback().catch((err) => {
@@ -77,6 +81,7 @@ export function setupConnectionHandler(
       restartRequiredCount = 0;
       logger.info('✅ Connected to WhatsApp');
       logger.info(`Phone number: ${socket.user?.id.split(':')[0] || 'Unknown'}`);
+      onConnectionOpen?.();
     }
 
     // Handle connection received
@@ -89,8 +94,6 @@ export function setupConnectionHandler(
   socket.ws.on('CB:stream:error', (error: any) => {
     logger.error({ error }, 'Stream error received from WhatsApp');
   });
-
-  socket.ev.on('creds.update', saveCreds);
 }
 
 /**

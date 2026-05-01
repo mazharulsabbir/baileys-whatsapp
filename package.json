@@ -2,12 +2,18 @@
   "name": "baileys-whatsapp",
   "version": "1.0.0",
   "description": "WhatsApp Web API integration using Baileys library",
-  "main": "dist/index.js",
+  "private": true,
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "bot:build": "tsc -p tsconfig.bot.json",
+    "bot:start": "node dist-bot/index.js",
+    "bot:dev": "tsc -p tsconfig.bot.json && node dist-bot/index.js"
   },
   "keywords": [
     "whatsapp",
@@ -17,18 +23,33 @@
   ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "@auth/prisma-adapter": "^2.8.0",
     "@hapi/boom": "^10.0.1",
+    "@prisma/client": "^6.19.0",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "bcryptjs": "^3.0.2",
     "dotenv": "^17.3.1",
+    "next": "^15.5.0",
+    "next-auth": "^5.0.0-beta.25",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",
-    "qrcode-terminal": "^0.12.0"
+    "prisma": "^6.19.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.13.0",
+    "@types/qrcode": "^1.5.5",
     "@types/qrcode-terminal": "^0.12.2",
-    "typescript": "^6.0.2"
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "eslint": "^9.21.0",
+    "eslint-config-next": "^15.5.0",
+    "typescript": "^5.8.2"
   }
 }

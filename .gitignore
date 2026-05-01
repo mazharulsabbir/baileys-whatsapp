@@ -19,6 +19,10 @@ whatsapp_session/
 *.session/
 auth_info/
 creds.json
+sessions/
+
+# Next.js
+.next/
 
 # Logs
 logs/

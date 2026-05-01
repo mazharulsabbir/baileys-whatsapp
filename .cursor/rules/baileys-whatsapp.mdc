@@ -1,0 +1,14 @@
+---
+description: Baileys WhatsApp bot — architecture, safety, and edit boundaries
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# Baileys WhatsApp project
+
+- **Stack:** Node.js 20+, TypeScript, `@whiskeysockets/baileys`, Pino logging.
+- **Flow:** `src/index.ts` → `WhatsAppService` in `src/services/whatsapp.ts`; connection lifecycle in `src/handlers/connection.handler.ts`; incoming messages and commands in `src/handlers/message.handler.ts`; env mapping in `src/config/index.ts`.
+- **Session:** Auth files live under `process.cwd()` + `SESSION_NAME` (default folder name from `.env`). Never commit session folders or `.env`.
+- **IDs:** WhatsApp JIDs use `number@s.whatsapp.net` (users) and `...@g.us` (groups). Validate JIDs when adding features.
+- **Changes:** Prefer extending `WhatsAppService` and handlers over duplicating Baileys socket usage. Keep disconnect/reconnect and `saveCreds` behavior intact when touching connection code.
+- **Compliance:** Do not add spam, bulk unsolicited messaging, or features that violate WhatsApp Terms of Service. Privacy-sensitive logs should use structured logger fields, not raw message bodies in production.

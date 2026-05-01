@@ -6,13 +6,27 @@ import {
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import config from '../config';
+import type { InboundWebhookPayload } from '../webhook-types';
+
+function tsToNumber(ts: unknown): number | undefined {
+  if (ts == null) return undefined;
+  if (typeof ts === 'number') return ts;
+  if (typeof ts === 'object' && ts !== null && 'low' in ts) {
+    const low = (ts as { low?: number }).low;
+    if (typeof low === 'number') return low;
+  }
+  return undefined;
+}
 
 /**
  * Setup message event handlers
+ * @param tenantId SaaS user id for outbound webhooks (omit for CLI-only bots)
  */
 export function setupMessageHandler(
   socket: WASocket,
-  logger: pino.Logger
+  logger: pino.Logger,
+  tenantId?: string,
+  onInboundWebhook?: (payload: InboundWebhookPayload) => void
 ): void {
   // Handle new messages
   socket.ev.on('messages.upsert', async (event) => {
@@ -20,7 +34,7 @@ export function setupMessageHandler(
 
     if (type === 'notify') {
       for (const message of messages) {
-        await handleMessage(socket, message, logger);
+        await handleMessage(socket, message, logger, tenantId, onInboundWebhook);
       }
     }
   });
@@ -100,10 +114,12 @@ export function setupMessageHandler(
 async function handleMessage(
   socket: WASocket,
   message: WAMessage,
-  logger: pino.Logger
+  logger: pino.Logger,
+  tenantId?: string,
+  onInboundWebhook?: (payload: InboundWebhookPayload) => void
 ): Promise<void> {
   const chatId = message.key.remoteJid;
-  const isGroup = chatId ? isJidGroup(chatId) : false;
+  const isGroup = Boolean(chatId && isJidGroup(chatId));
   const fromMe = message.key.fromMe;
   const senderId = fromMe ? 'me' : (message.key.participant || message.key.remoteJid);
   const senderName = message.pushName || 'Unknown';
@@ -155,6 +171,26 @@ async function handleMessage(
   // Handle commands only for incoming messages
   if (!fromMe && messageContent && typeof messageContent === 'string') {
     await handleCommand(socket, message, messageContent, logger);
+  }
+
+  // Odoo / integration webhook (incoming only)
+  if (!fromMe && tenantId && onInboundWebhook) {
+    onInboundWebhook({
+      event: 'message.received',
+      tenantId,
+      messageId: message.key.id ?? undefined,
+      from: typeof senderId === 'string' ? senderId : String(senderId ?? ''),
+      chatId: chatId ?? undefined,
+      type: getMessageType(message),
+      text:
+        messageContent != null && typeof messageContent === 'string'
+          ? messageContent
+          : null,
+      senderName,
+      isGroup,
+      timestamp: tsToNumber(message.messageTimestamp),
+      ...(groupName ? { groupName } : {}),
+    });
   }
 }
 

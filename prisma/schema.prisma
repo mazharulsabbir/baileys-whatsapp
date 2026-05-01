@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String                  @id @default(cuid())
+  email          String                  @unique
+  passwordHash   String
+  name           String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  payments       Payment[]
+  entitlement    Entitlement?
+  integration    IntegrationCredential?
+  apiUsageEvents ApiUsageEvent[]
+}
+
+/// Append-only log of integration API calls (messages, status) for dashboard analytics.
+model ApiUsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route     String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Machine-to-machine API key + outbound webhook settings (Odoo / automation).
+model IntegrationCredential {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeyHash     String
+  apiKeyPrefix   String   @default("")
+  webhookUrl     String?
+  /// Shared secret for HMAC-SHA256 of JSON body when POSTing to webhookUrl (stored server-side).
+  webhookSecret  String?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Entitlement {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planSlug   String
+  status     String
+  validUntil DateTime
+  updatedAt  DateTime @updatedAt
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tranId     String   @unique
+  valId      String?
+  amount     String
+  currency   String
+  status     String
+  planSlug   String?
+  rawPayload Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

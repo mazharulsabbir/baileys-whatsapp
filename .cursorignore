@@ -1,0 +1,10 @@
+﻿# Reduce indexing noise (mirrors common excludes from .gitignore)
+node_modules/
+dist/
+build/
+whatsapp_session/
+*.session/
+auth_info/
+coverage/
+.nyc_output/
+logs/

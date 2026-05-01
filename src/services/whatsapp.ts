@@ -14,6 +14,24 @@ import fs from 'fs';
 import config from '../config';
 import { setupConnectionHandler } from '../handlers/connection.handler';
 import { setupMessageHandler } from '../handlers/message.handler';
+import type { InboundWebhookPayload } from '../webhook-types';
+
+/** Options for a tenant-scoped WhatsApp connection */
+export interface WhatsAppServiceOptions {
+  tenantId: string;
+  /** Directory containing per-tenant session folders (e.g. `join(root, tenantId)`) */
+  authBaseDir: string;
+  logger?: pino.Logger;
+  authMethod?: 'qr' | 'pairing';
+  phoneNumber?: string;
+  printQRInTerminal?: boolean;
+  syncFullHistory?: boolean;
+  autoReconnect?: boolean;
+  /** Called whenever a new QR string is available (web dashboard) */
+  onQr?: (qr: string) => void;
+  /** SaaS: forward inbound messages to Odoo / automation (optional) */
+  onInboundWebhook?: (payload: InboundWebhookPayload) => void;
+}
 
 /**
  * Get MIME type from file extension
@@ -61,19 +79,38 @@ export class WhatsAppService {
   private socket: WASocket | null = null;
   private logger: pino.Logger;
   private authPath: string;
+  private opts: WhatsAppServiceOptions;
+  private latestQr: string | null = null;
 
-  constructor() {
-    this.logger = pino({
-      level: config.logLevel,
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true
+  constructor(options: WhatsAppServiceOptions) {
+    this.opts = options;
+    const safeId = options.tenantId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    this.authPath = path.join(options.authBaseDir, safeId);
+
+    this.logger =
+      options.logger ??
+      pino({
+        level: config.logLevel,
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            colorize: true
+          }
         }
-      }
-    });
+      });
+  }
 
-    this.authPath = path.join(process.cwd(), config.sessionName);
+  /** Latest QR payload from Baileys (until paired or cleared) */
+  getLatestQr(): string | null {
+    return this.latestQr;
+  }
+
+  clearLatestQr(): void {
+    this.latestQr = null;
+  }
+
+  getTenantId(): string {
+    return this.opts.tenantId;
   }
 
   /**
@@ -100,7 +137,7 @@ export class WhatsAppService {
         printQRInTerminal: false, // We'll handle QR printing manually
         logger: this.logger.child({ class: 'baileys' }),
         browser: browserConfig,
-        syncFullHistory: config.syncFullHistory,
+        syncFullHistory: this.opts.syncFullHistory ?? config.syncFullHistory,
         markOnlineOnConnect: true,
         connectTimeoutMs: 60000,
         keepAliveIntervalMs: 30000,
@@ -149,11 +186,30 @@ export class WhatsAppService {
       this.logger,
       saveCreds,
       () => clearSession(this.authPath, this.logger),
-      () => this.connect()
+      () => this.connect(),
+      (qr) => {
+        this.latestQr = qr;
+        this.opts.onQr?.(qr);
+        if (this.opts.printQRInTerminal ?? config.printQRInTerminal) {
+          qrcode.generate(qr, { small: true }, (ascii) => {
+            console.log('\n📱 Scan this QR code with WhatsApp:\n');
+            console.log(ascii);
+            console.log('\n');
+          });
+        }
+      },
+      this.opts.autoReconnect ?? config.autoReconnect,
+      () => {
+        this.latestQr = null;
+      }
     );
 
-    // Message updates
-    setupMessageHandler(this.socket, this.logger);
+    setupMessageHandler(
+      this.socket,
+      this.logger,
+      this.opts.tenantId,
+      this.opts.onInboundWebhook
+    );
 
     // Save credentials on update
     this.socket.ev.on('creds.update', saveCreds);
@@ -165,24 +221,15 @@ export class WhatsAppService {
   private async handleAuthentication(): Promise<void> {
     if (!this.socket) return;
 
-    if (config.authMethod === 'pairing' && config.phoneNumber) {
-      // Use pairing code authentication
-      const result = await this.socket.requestPairingCode(config.phoneNumber);
+    const authMethod = this.opts.authMethod ?? config.authMethod;
+    const phoneNumber = this.opts.phoneNumber ?? config.phoneNumber;
+
+    if (authMethod === 'pairing' && phoneNumber) {
+      const result = await this.socket.requestPairingCode(phoneNumber);
       this.logger.info(`Pairing code: ${result}`);
       console.log(`\n📱 Pairing Code: ${result}\n`);
-    } else if (config.printQRInTerminal) {
-      // Print QR code to terminal
-      this.socket.ev.on('connection.update', async (update) => {
-        const { qr } = update;
-        if (qr) {
-          qrcode.generate(qr, { small: true }, (qrcode) => {
-            console.log('\n📱 Scan this QR code with WhatsApp:\n');
-            console.log(qrcode);
-            console.log('\n');
-          });
-        }
-      });
     }
+    // QR flow is handled via setupConnectionHandler onQr (no duplicate listeners)
   }
 
   /**
@@ -390,7 +437,7 @@ export class WhatsAppService {
    * Check if connected
    */
   isConnected(): boolean {
-    return this.socket !== null;
+    return this.socket !== null && this.socket.user != null;
   }
 
   /**
@@ -400,11 +447,28 @@ export class WhatsAppService {
     if (this.socket) {
       this.socket.end(undefined);
       this.socket = null;
+      this.latestQr = null;
       this.logger.info('Disconnected from WhatsApp');
     }
   }
 }
 
-// Export singleton instance
-export const whatsappService = new WhatsAppService();
+export function createWhatsAppService(options: WhatsAppServiceOptions): WhatsAppService {
+  return new WhatsAppService(options);
+}
+
+/** CLI / legacy single-folder session: `authBaseDir/tenantId` matches former `cwd/sessionName` */
+export function createDefaultWhatsAppService(): WhatsAppService {
+  return createWhatsAppService({
+    tenantId: config.sessionName,
+    authBaseDir: process.cwd(),
+    authMethod: config.authMethod,
+    phoneNumber: config.phoneNumber,
+    printQRInTerminal: config.printQRInTerminal,
+    syncFullHistory: config.syncFullHistory,
+    autoReconnect: config.autoReconnect
+  });
+}
+
+export const whatsappService = createDefaultWhatsAppService();
 export default whatsappService;

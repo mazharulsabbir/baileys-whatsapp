@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_saas_whatsapp_user" model="res.groups">
+        <field name="name">WhatsApp SaaS / User</field>
+    </record>
+</odoo>

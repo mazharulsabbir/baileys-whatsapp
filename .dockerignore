@@ -1,0 +1,33 @@
+# Dependencies & build output (never copy from host — Linux image builds its own)
+node_modules
+.next
+out
+dist
+dist-bot
+build
+
+# Git & tooling
+.git
+.gitignore
+.cursor
+.vscode
+*.md
+AGENTS.md
+
+# Env & secrets (image must not embed these; compose injects at runtime)
+.env
+.env.*
+!.env.example
+
+# Logs & OS junk
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# Test & misc
+coverage
+.turbo
+*.swp
+*.swo

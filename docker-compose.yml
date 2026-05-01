@@ -1,0 +1,54 @@
+# Compose v2.24+ supports optional env_file. If your CLI errors here, upgrade Docker Desktop
+# or remove the `path` / `required` keys and use `env_file: [ .env ]` after copying `.env.example` → `.env`.
+name: baileys-whatsapp
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      # Use container env vars ($$ → $) so this matches custom POSTGRES_* without compose interpolation issues
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: baileys-whatsapp-web:latest
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Always use the Compose network hostname — do not reuse host DATABASE_URL from .env (localhost).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production-use-openssl-rand-base64-32}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # Must match the named volume mount below
+      WHATSAPP_SESSION_ROOT: /data/sessions
+      SSLCOMMERZ_STORE_ID: ${SSLCOMMERZ_STORE_ID:-}
+      SSLCOMMERZ_STORE_PASSWORD: ${SSLCOMMERZ_STORE_PASSWORD:-}
+      SSLCOMMERZ_IS_LIVE: ${SSLCOMMERZ_IS_LIVE:-false}
+    volumes:
+      - whatsapp_sessions:/data/sessions
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  whatsapp_sessions:
