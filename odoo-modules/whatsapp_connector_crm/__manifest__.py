@@ -40,7 +40,10 @@
     'assets': {
         'web.assets_backend': [
             'whatsapp_connector_crm/static/src/components/*/*.xml',
-            'whatsapp_connector_crm/static/src/jslib/chatroom.js',
+            # Split from chatroom.vendor.bundle.js — regenerate: node whatsapp_connector/scripts/split-chatroom-extension.mjs whatsapp_connector_crm
+            'whatsapp_connector_crm/static/src/jslib/chatroom_modules/00_crm_lead_form.js',
+            'whatsapp_connector_crm/static/src/jslib/chatroom_modules/01_patch_tabs_container.js',
+            'whatsapp_connector_crm/static/src/jslib/chatroom_modules/02_patch_conversation_model.js',
         ],
     },
 }

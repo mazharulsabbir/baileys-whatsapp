@@ -4,6 +4,7 @@ import {
   WhatsAppService,
 } from '../src/services/whatsapp';
 import { deliverInboundWebhook } from './webhook-outbound';
+import { deliverOdooPhoneStatus } from './odoo-webhook-delivery';
 
 const instances = new Map<string, WhatsAppService>();
 
@@ -33,6 +34,9 @@ export async function ensureConnecting(userId: string): Promise<WhatsAppService>
     printQRInTerminal: false,
     autoReconnect: true,
     onInboundWebhook: (payload) => deliverInboundWebhook(payload.tenantId, payload),
+    onConnectionState: (state) => {
+      deliverOdooPhoneStatus(userId, state);
+    },
   });
   instances.set(userId, svc);
   await svc.connect().catch(() => {

@@ -7,6 +7,8 @@ import {
 import pino from 'pino';
 import config from '../config';
 import type { InboundWebhookPayload } from '../webhook-types';
+import { prepareAcuxInboundRow } from '@/lib/odoo-acrux-mapper';
+import { deliverAcuxInboundRow, deliverAcuxMessageDeletes } from '@/lib/odoo-webhook-delivery';
 
 function tsToNumber(ts: unknown): number | undefined {
   if (ts == null) return undefined;
@@ -54,9 +56,13 @@ export function setupMessageHandler(
     }
   });
 
-  // Handle message delete
+  // Handle message delete (revoke) → Odoo ChatRoom `deleted` event
   socket.ev.on('messages.delete', async (event) => {
     logger.debug(event, 'Messages deleted');
+    if (!tenantId) return;
+    if ('keys' in event && Array.isArray(event.keys) && event.keys.length > 0) {
+      deliverAcuxMessageDeletes(tenantId, event.keys);
+    }
   });
 
   // Handle message reaction
@@ -173,7 +179,7 @@ async function handleMessage(
     await handleCommand(socket, message, messageContent, logger);
   }
 
-  // Odoo / integration webhook (incoming only)
+  // Flat JSON webhook (Bearer integration)
   if (!fromMe && tenantId && onInboundWebhook) {
     onInboundWebhook({
       event: 'message.received',
@@ -191,6 +197,16 @@ async function handleMessage(
       timestamp: tsToNumber(message.messageTimestamp),
       ...(groupName ? { groupName } : {}),
     });
+  }
+
+  // Odoo ChatRoom Acrux-shaped webhook (requires config_set URL on gateway credentials)
+  if (!fromMe && tenantId) {
+    try {
+      const row = await prepareAcuxInboundRow(socket, message, tenantId, logger);
+      deliverAcuxInboundRow(tenantId, row);
+    } catch (e) {
+      logger.warn({ e }, 'Odoo Acrux inbound prepare/delivery failed');
+    }
   }
 }
 

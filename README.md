@@ -87,10 +87,11 @@ docker compose up --build
 
 ### Odoo integration (SaaS API + webhooks)
 
-- **SaaS app:** With an active subscription, open **Dashboard** → **Odoo / API integration** to generate an **API key**, set **webhook URL** (your Odoo endpoint), and rotate the **webhook secret** as needed.
-- **HTTP API:** `POST {APP_URL}/api/integration/v1/messages` with `Authorization: Bearer <api_key>` and JSON body `{ "to": "E164_OR_JID", "type": "text", "text": "…" }`. `GET .../api/integration/v1/status` returns connection state.
-- **Inbound:** The server POSTs JSON to your configured URL with `X-Signature: sha256=…` (HMAC-SHA256 of the raw body). See [odoo-modules/whatsapp_saas_bridge/AGENTS.md](odoo-modules/whatsapp_saas_bridge/AGENTS.md).
-- **Env:** `NEXT_PUBLIC_APP_URL` (or `AUTH_URL`) should be the public origin users and Odoo can reach; keep `DATABASE_URL` and `WHATSAPP_SESSION_ROOT` consistent in Docker (see `.env.example`).
+- **SaaS app:** With an active subscription, open **Dashboard** → **Odoo / API integration** to generate an **API key**, provision **Odoo ChatRoom gateway** credentials (Account ID + token), set optional **webhook URL** for simple HMAC integrations, and rotate secrets as needed.
+- **HTTP API (Bearer):** `POST {APP_URL}/api/integration/v1/messages` with `Authorization: Bearer <api_key>` and JSON body `{ "to": "E164_OR_JID", "type": "text", "text": "…" }`. `GET .../api/integration/v1/status` returns connection state.
+- **Odoo ChatRoom gateway (header auth):** Single URL `{APP_URL}/api/gateway/v1` — Odoo sends headers `token`, `client_id` (connector UUID), and `action` (`status_get`, `send`, `config_set`, …). Provision UUID + token from the dashboard; paste **API Endpoint** = gateway URL in the connector.
+- **Inbound:** For the Bearer integration, the server POSTs JSON to your configured webhook URL with `X-Signature: sha256=…` (HMAC-SHA256). For **Odoo ChatRoom**, after **`config_set`**, the server POSTs Acrux-shaped JSON (`messages` / `events` / `updates`) to Odoo’s `acrux_webhook` URL — including **`phone-status`** on connect/disconnect, **`deleted`** when messages are revoked server-side, and **hosted media** URLs (`GET /api/public/wa-media/[id]`) when `NEXT_PUBLIC_APP_URL` is set. Failed deliveries after retries are stored and can be **retried** from the dashboard (**Odoo webhook delivery failures**).
+- **Env:** Set **`NEXT_PUBLIC_APP_URL`** to the HTTPS origin Odoo can call for media (required for image/video/document inbound). Optional **`WHATSAPP_MEDIA_ROOT`** overrides the on-disk cache folder (default `wa-media-cache/`). Run **`prisma migrate`** for dead-letter and media tables.
 
 ## Configuration
 

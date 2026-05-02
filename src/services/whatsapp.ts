@@ -31,6 +31,8 @@ export interface WhatsAppServiceOptions {
   onQr?: (qr: string) => void;
   /** SaaS: forward inbound messages to Odoo / automation (optional) */
   onInboundWebhook?: (payload: InboundWebhookPayload) => void;
+  /** SaaS: WhatsApp socket open/close (Odoo phone-status events) */
+  onConnectionState?: (state: 'open' | 'close') => void;
 }
 
 /**
@@ -201,7 +203,8 @@ export class WhatsAppService {
       this.opts.autoReconnect ?? config.autoReconnect,
       () => {
         this.latestQr = null;
-      }
+      },
+      this.opts.onConnectionState
     );
 
     setupMessageHandler(
@@ -233,12 +236,13 @@ export class WhatsAppService {
   }
 
   /**
-   * Send a text message
+   * Send a text message.
+   * @returns WhatsApp message id when available
    */
   async sendMessage(jid: string, text: string, options?: {
     quoted?: proto.IWebMessageInfo;
     mentions?: string[];
-  }): Promise<void> {
+  }): Promise<string | undefined> {
     if (!this.socket) {
       throw new Error('Socket not initialized. Call connect() first.');
     }
@@ -252,7 +256,8 @@ export class WhatsAppService {
       message.quoted = options.quoted;
     }
 
-    await this.socket.sendMessage(jid, message);
+    const result = await this.socket.sendMessage(jid, message);
+    return result?.key?.id ?? undefined;
   }
 
   /**

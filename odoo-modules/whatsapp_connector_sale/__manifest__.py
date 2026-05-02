@@ -43,7 +43,14 @@
         'web.assets_backend': [
             'whatsapp_connector_sale/static/src/components/*/*.scss',
             'whatsapp_connector_sale/static/src/components/*/*.xml',
-            'whatsapp_connector_sale/static/src/jslib/chatroom.js',
+            # Split from chatroom.vendor.bundle.js — regenerate: node whatsapp_connector/scripts/split-chatroom-extension.mjs whatsapp_connector_sale
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/00_sale_form.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/01_patch_chatroom.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/02_sale_indicator.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/03_patch_tabs_container.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/04_patch_conversation_model.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/05_sale_form_renderer.js',
+            'whatsapp_connector_sale/static/src/jslib/chatroom_modules/06_sale_form_view.js',
         ],
     },
 }

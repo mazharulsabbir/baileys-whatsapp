@@ -18,7 +18,8 @@ export function setupConnectionHandler(
   reconnectCallback?: () => Promise<void>,
   onQr?: (qr: string) => void,
   autoReconnectEnabled: boolean = config.autoReconnect,
-  onConnectionOpen?: () => void
+  onConnectionOpen?: () => void,
+  onConnectionState?: (state: 'open' | 'close') => void
 ): void {
   let restartRequiredCount = 0;
   const MAX_RESTART_ATTEMPTS = 2;
@@ -35,6 +36,7 @@ export function setupConnectionHandler(
 
     // Handle connection status
     if (connection === 'close') {
+      onConnectionState?.('close');
       logger.warn('Connection closed');
 
       // Get disconnect reason
@@ -82,6 +84,7 @@ export function setupConnectionHandler(
       logger.info('✅ Connected to WhatsApp');
       logger.info(`Phone number: ${socket.user?.id.split(':')[0] || 'Unknown'}`);
       onConnectionOpen?.();
+      onConnectionState?.('open');
     }
 
     // Handle connection received

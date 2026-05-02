@@ -6,6 +6,7 @@ import {
   rotateApiKey,
   updateWebhookSettings,
 } from '@/lib/integration-credential';
+import { getOdooGatewayPublic, provisionOdooGateway } from '@/lib/odoo-gateway-credential';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,8 +22,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Active subscription required' }, { status: 403 });
   }
 
-  const pub = await getCredentialPublic(session.user.id);
-  return NextResponse.json(pub);
+  const [pub, odoo] = await Promise.all([
+    getCredentialPublic(session.user.id),
+    getOdooGatewayPublic(session.user.id),
+  ]);
+  return NextResponse.json({ ...pub, ...odoo });
 }
 
 export async function POST(req: Request) {
@@ -49,6 +53,19 @@ export async function POST(req: Request) {
       apiKey,
       apiKeyPrefix,
       warning: 'Save this API key now; it will not be shown again.',
+    });
+  }
+
+  if (body.action === 'provisionOdooGateway') {
+    const { connectorUuid, token, tokenPrefix } = await provisionOdooGateway(
+      session.user.id
+    );
+    return NextResponse.json({
+      connectorUuid,
+      token,
+      tokenPrefix,
+      warning:
+        'Save the token and Account ID (connector UUID) now. The token is shown only once. Use them in Odoo ChatRoom connector fields.',
     });
   }
 

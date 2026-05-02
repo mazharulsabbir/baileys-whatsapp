@@ -17,7 +17,55 @@ model User {
   payments       Payment[]
   entitlement    Entitlement?
   integration    IntegrationCredential?
+  odooGateway    OdooGatewayCredential?
   apiUsageEvents ApiUsageEvent[]
+  odooWebhookDlq OdooWebhookDeadLetter[]
+}
+
+/// Odoo ChatRoom connector credentials (gateway headers token + client_id).
+model OdooGatewayCredential {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectorUuid  String   @unique
+  tokenHash      String
+  tokenPrefix    String   @default("")
+  /// Full POST URL registered via Odoo config_set (acrux_webhook).
+  odooWebhookUrl String?
+  configSetInfo  Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Failed POST to Odoo acrux_webhook after retries (manual replay from dashboard).
+model OdooWebhookDeadLetter {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webhookUrl  String
+  payload     Json
+  lastError   String?
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, resolvedAt])
+  @@index([createdAt])
+}
+
+/// Cached inbound WA media file on disk; served at /api/public/wa-media/[id] for Odoo `url` field.
+model WaMediaArtifact {
+  id         String   @id @default(cuid())
+  userId     String
+  mimeType   String
+  fileName   String
+  byteLength Int
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 /// Append-only log of integration API calls (messages, status) for dashboard analytics.
