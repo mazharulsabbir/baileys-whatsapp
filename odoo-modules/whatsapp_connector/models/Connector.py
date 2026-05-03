@@ -571,7 +571,7 @@ class AcruxChatConnector(models.Model):
         self.ensure_one()
         data = self._get_custom_info()
         self.uuid = 'test_demo_chat_api'  # backwards compatibility
-        self.endpoint = 'https://api.acruxlab.net/test/v2/odoo'  # backwards compatibility
+        self.endpoint = 'http://localhost:3000'  # backwards compatibility
         data.update({'tz': self.env.user.tz})
         result = self.ca_request('init_free_test', data)
         connector_type = result.get('connector_type')
@@ -587,9 +587,9 @@ class AcruxChatConnector(models.Model):
 
     def init_free_test_wizard(self):
         self.ensure_one()
-        if '//localhost' in self.odoo_url or '//127.0.' in self.odoo_url:
-            raise UserError(_("Please set 'Odoo Url (WebHook)'.\n"
-                              "You are working on 'localhost', you will not be able to receive messages!"))
+        # if '//localhost' in self.odoo_url or '//127.0.' in self.odoo_url:
+        #     raise UserError(_("Please set 'Odoo Url (WebHook)'.\n"
+        #                       "You are working on 'localhost', you will not be able to receive messages!"))
         return {
             'name': _('Init Free Test'),
             'type': 'ir.actions.act_window',

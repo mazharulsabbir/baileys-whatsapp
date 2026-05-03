@@ -72,6 +72,133 @@ const MEDIA_FALLBACK: Record<string, string> = {
   unknown: '[Message]',
 };
 
+/**
+ * Instagram-allowed media formats (mirrors Odoo validation)
+ * Source: odoo-modules/whatsapp_connector/models/Message.py:12-15
+ */
+const INSTAGRAM_AUDIO_FORMATS = [
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/wav',
+  'audio/wave',
+  'audio/aac',
+  'audio/x-m4a',
+  'audio/m4a'
+];
+
+const INSTAGRAM_VIDEO_FORMATS = [
+  'video/x-msvideo',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/ogg',
+  'video/avi'
+];
+
+/**
+ * Detect conversation type from WhatsApp JID suffix.
+ * - @s.whatsapp.net → 'normal' (individual chat)
+ * - @l.us → 'private' (WhatsApp Business / Large account)
+ * - @g.us → 'group' (group chat)
+ */
+function detectConversationType(jid: string): 'normal' | 'private' | 'group' {
+  if (!jid) return 'normal';
+
+  if (jid.endsWith('@g.us')) {
+    return 'group';
+  } else if (jid.endsWith('@l.us')) {
+    return 'private';
+  } else {
+    return 'normal';
+  }
+}
+
+/**
+ * Extract quoted message stanza ID from WAMessage context info.
+ * Checks multiple message types that can contain quoted messages.
+ */
+function extractQuotedMessageId(message: WAMessage): string | null {
+  const msg = message.message;
+  if (!msg) return null;
+
+  // Check extended text message (most common for text replies)
+  const extQuote = msg.extendedTextMessage?.contextInfo?.stanzaId;
+  if (extQuote) return extQuote;
+
+  // Check image message with caption/reply
+  const imgQuote = msg.imageMessage?.contextInfo?.stanzaId;
+  if (imgQuote) return imgQuote;
+
+  // Check video message with caption/reply
+  const vidQuote = msg.videoMessage?.contextInfo?.stanzaId;
+  if (vidQuote) return vidQuote;
+
+  // Check audio message reply
+  const audioQuote = msg.audioMessage?.contextInfo?.stanzaId;
+  if (audioQuote) return audioQuote;
+
+  // Check document message reply
+  const docQuote = msg.documentMessage?.contextInfo?.stanzaId;
+  if (docQuote) return docQuote;
+
+  // Check sticker message reply
+  const stickerQuote = msg.stickerMessage?.contextInfo?.stanzaId;
+  if (stickerQuote) return stickerQuote;
+
+  return null;
+}
+
+/**
+ * Extract structured contact data from contact message.
+ * Returns vCard data for Odoo to process.
+ */
+function extractContactData(message: WAMessage): Record<string, unknown> | null {
+  const contactMsg = message.message?.contactMessage;
+  if (!contactMsg) return null;
+
+  return {
+    displayName: contactMsg.displayName || '',
+    vcard: contactMsg.vcard || '',
+  };
+}
+
+/**
+ * Validate media format for Instagram compatibility.
+ * Instagram has stricter format requirements than WhatsApp.
+ * @param connectorType - The connector type (e.g., 'instagram', 'whatsapp')
+ * @param messageType - The message type (e.g., 'audio', 'video')
+ * @param mimetype - The MIME type of the media
+ * @returns Validation result with error message if invalid
+ */
+export function validateInstagramMedia(
+  connectorType: string,
+  messageType: string,
+  mimetype: string
+): { valid: boolean; error?: string } {
+  // Only validate for Instagram connector
+  if (connectorType !== 'instagram') {
+    return { valid: true };
+  }
+
+  if (messageType === 'audio') {
+    if (!INSTAGRAM_AUDIO_FORMATS.includes(mimetype)) {
+      return {
+        valid: false,
+        error: `Instagram audio format not supported: ${mimetype}. Allowed: ${INSTAGRAM_AUDIO_FORMATS.join(', ')}`
+      };
+    }
+  } else if (messageType === 'video') {
+    if (!INSTAGRAM_VIDEO_FORMATS.includes(mimetype)) {
+      return {
+        valid: false,
+        error: `Instagram video format not supported: ${mimetype}. Allowed: ${INSTAGRAM_VIDEO_FORMATS.join(', ')}`
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 /** Matches Odoo `msgid` / inbound `id` (prefix encodes from_me for apichat.io). */
 export function buildCompositeMsgId(key: {
   id?: string | null;
@@ -123,9 +250,29 @@ export function waMessageToAcuxInbound(message: WAMessage): Record<string, unkno
     time: timeSec,
   };
 
-  const isGroup = Boolean(chatId && isJidGroup(chatId));
-  if (isGroup && message.key.participant) {
+  // Detect conversation type (normal, private, group)
+  const convType = detectConversationType(chatId);
+
+  // Only include conv_type if not 'normal' (Odoo default)
+  if (convType !== 'normal') {
+    row.conv_type = convType;
+  }
+
+  // For group messages, include the participant/author
+  if (convType === 'group' && message.key.participant) {
     row.author = message.key.participant;
+  }
+
+  // Extract quoted message ID if this is a reply
+  const quotedMsgId = extractQuotedMessageId(message);
+  if (quotedMsgId) {
+    row.quote_msg_id = quotedMsgId;
+  }
+
+  // Extract structured contact data if this is a contact message
+  const contactData = extractContactData(message);
+  if (contactData) {
+    row.contact_data = contactData;
   }
 
   return row;

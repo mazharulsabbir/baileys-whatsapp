@@ -16,6 +16,10 @@ export function getExistingService(userId: string): WhatsAppService | undefined 
   return instances.get(userId);
 }
 
+export function getAllServices(): Map<string, WhatsAppService> {
+  return instances;
+}
+
 export async function ensureConnecting(userId: string): Promise<WhatsAppService> {
   const existing = instances.get(userId);
   if (existing) {

@@ -201,10 +201,25 @@ async function handleMessage(
 
   // Odoo ChatRoom Acrux-shaped webhook (requires config_set URL on gateway credentials)
   if (!fromMe && tenantId) {
+    console.log('[WEBHOOK DEBUG] Processing inbound message for Odoo', {
+      tenantId,
+      messageId: message.key.id,
+      chatId: chatId
+    });
+
     try {
       const row = await prepareAcuxInboundRow(socket, message, tenantId, logger);
+      console.log('[WEBHOOK DEBUG] Prepared Acrux row:', {
+        type: row.type,
+        txt: typeof row.txt === 'string' ? row.txt.substring(0, 50) : row.txt,
+        id: row.id,
+        number: row.number
+      });
+
       deliverAcuxInboundRow(tenantId, row);
+      console.log('[WEBHOOK DEBUG] deliverAcuxInboundRow called');
     } catch (e) {
+      console.error('[WEBHOOK DEBUG] Odoo Acrux inbound prepare/delivery failed:', e);
       logger.warn({ e }, 'Odoo Acrux inbound prepare/delivery failed');
     }
   }

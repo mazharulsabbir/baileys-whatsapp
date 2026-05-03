@@ -49,6 +49,7 @@ class WebhookController(http.Controller):
     def acrux_webhook(self, connector_uuid, **post):
         ''' Keeping "Account ID" secret. '''
         try:
+            print(post)
             if not post:
                 return Response(status=403)  # Forbidden
             log_request(request)

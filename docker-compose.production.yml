@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: baileys-whatsapp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - baileys-network
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: baileys-whatsapp-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
+
+      # Authentication
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+
+      # WhatsApp
+      WHATSAPP_SESSION_ROOT: /app/sessions
+      WHATSAPP_MEDIA_ROOT: /app/wa-media-cache
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL}
+
+      # Odoo Integration
+      ODOO_BASE_URL: ${ODOO_BASE_URL}
+      ODOO_WEBHOOK_PATH: ${ODOO_WEBHOOK_PATH:-/acrux_webhook/whatsapp_connector}
+      ODOO_API_TOKEN: ${ODOO_API_TOKEN}
+      ODOO_CONNECTOR_UUID: ${ODOO_CONNECTOR_UUID}
+
+      # Webhook Configuration
+      WEBHOOK_MAX_RETRIES: ${WEBHOOK_MAX_RETRIES:-3}
+      WEBHOOK_RETRY_DELAY_MS: ${WEBHOOK_RETRY_DELAY_MS:-1000}
+      WEBHOOK_TIMEOUT_MS: ${WEBHOOK_TIMEOUT_MS:-10000}
+      ENABLE_WEBHOOK_DLQ: ${ENABLE_WEBHOOK_DLQ:-true}
+      WEBHOOK_DLQ_PATH: /app/logs/webhook-dlq
+
+      # Payment Gateway
+      SSLCOMMERZ_STORE_ID: ${SSLCOMMERZ_STORE_ID}
+      SSLCOMMERZ_STORE_PASSWORD: ${SSLCOMMERZ_STORE_PASSWORD}
+      SSLCOMMERZ_IS_LIVE: ${SSLCOMMERZ_IS_LIVE:-true}
+
+      # Application
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Health Check
+      HEALTH_CHECK_TIMEOUT: ${HEALTH_CHECK_TIMEOUT:-5000}
+      HEALTH_CHECK_DETAILED: ${HEALTH_CHECK_DETAILED:-false}
+
+      # Rate Limiting
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-60}
+      WEBHOOK_RATE_LIMIT: ${WEBHOOK_RATE_LIMIT:-100}
+
+      # Session Management
+      AUTO_RECONNECT: ${AUTO_RECONNECT:-true}
+      SESSION_KEEPALIVE_INTERVAL: ${SESSION_KEEPALIVE_INTERVAL:-30000}
+
+      # Security
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      ENABLE_REQUEST_LOGGING: ${ENABLE_REQUEST_LOGGING:-true}
+
+      # Monitoring
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      METRICS_ENDPOINT: ${METRICS_ENDPOINT:-/api/metrics}
+
+    volumes:
+      # Persistent WhatsApp session data (multi-tenant)
+      - whatsapp_sessions:/app/sessions
+      # Media cache storage
+      - media_cache:/app/wa-media-cache
+      # Webhook DLQ logs
+      - webhook_dlq:/app/logs/webhook-dlq
+      # Application logs
+      - app_logs:/app/logs
+      # Backups
+      - backups:/app/backups
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - baileys-network
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  baileys-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  whatsapp_sessions:
+    driver: local
+  media_cache:
+    driver: local
+  webhook_dlq:
+    driver: local
+  app_logs:
+    driver: local
+  backups:
+    driver: local

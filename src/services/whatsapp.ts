@@ -15,6 +15,8 @@ import config from '../config';
 import { setupConnectionHandler } from '../handlers/connection.handler';
 import { setupMessageHandler } from '../handlers/message.handler';
 import type { InboundWebhookPayload } from '../webhook-types';
+import { deliverOdooFailedMessage } from '@/lib/odoo-webhook-delivery';
+import { buildCompositeMsgId } from '@/lib/odoo-acrux-mapper';
 
 /** Options for a tenant-scoped WhatsApp connection */
 export interface WhatsAppServiceOptions {
@@ -256,8 +258,29 @@ export class WhatsAppService {
       message.quoted = options.quoted;
     }
 
-    const result = await this.socket.sendMessage(jid, message);
-    return result?.key?.id ?? undefined;
+    try {
+      const result = await this.socket.sendMessage(jid, message);
+      return result?.key?.id ?? undefined;
+    } catch (error) {
+      // Build composite message ID for Odoo correlation
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(), // Temporary ID since send failed
+        remoteJid: jid,
+        fromMe: true
+      });
+
+      const reason = error instanceof Error
+        ? error.message
+        : 'Failed to send message';
+
+      // Report failure to Odoo if tenant ID is available
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
+      }
+
+      this.logger.error({ error, jid, text }, 'Failed to send text message');
+      throw error; // Re-throw for caller handling
+    }
   }
 
   /**
@@ -268,10 +291,26 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      image: typeof image === 'string' ? { url: image } : image,
-      caption
-    });
+    try {
+      await this.socket.sendMessage(jid, {
+        image: typeof image === 'string' ? { url: image } : image,
+        caption
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send image';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
+      }
+
+      this.logger.error({ error, jid, caption }, 'Failed to send image message');
+      throw error;
+    }
   }
 
   /**
@@ -282,10 +321,26 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      video: typeof video === 'string' ? { url: video } : video,
-      caption
-    });
+    try {
+      await this.socket.sendMessage(jid, {
+        video: typeof video === 'string' ? { url: video } : video,
+        caption
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send video';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
+      }
+
+      this.logger.error({ error, jid, caption }, 'Failed to send video message');
+      throw error;
+    }
   }
 
   /**
@@ -296,11 +351,27 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      audio: typeof audio === 'string' ? { url: audio } : audio,
-      ptt,
-      mimetype: 'audio/ogg; codecs=opus'
-    });
+    try {
+      await this.socket.sendMessage(jid, {
+        audio: typeof audio === 'string' ? { url: audio } : audio,
+        ptt,
+        mimetype: 'audio/ogg; codecs=opus'
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send audio';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
+      }
+
+      this.logger.error({ error, jid, ptt }, 'Failed to send audio message');
+      throw error;
+    }
   }
 
   /**
@@ -311,12 +382,28 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      document: typeof document === 'string' ? { url: document } : document,
-      fileName,
-      caption,
-      mimetype: fileName ? getMimeType(fileName) : 'application/octet-stream'
-    });
+    try {
+      await this.socket.sendMessage(jid, {
+        document: typeof document === 'string' ? { url: document } : document,
+        fileName,
+        caption,
+        mimetype: fileName ? getMimeType(fileName) : 'application/octet-stream'
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send document';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
+      }
+
+      this.logger.error({ error, jid, fileName }, 'Failed to send document message');
+      throw error;
+    }
   }
 
   /**
@@ -327,13 +414,29 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      location: {
-        degreesLatitude: latitude,
-        degreesLongitude: longitude,
-        name
+    try {
+      await this.socket.sendMessage(jid, {
+        location: {
+          degreesLatitude: latitude,
+          degreesLongitude: longitude,
+          name
+        }
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send location';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
       }
-    });
+
+      this.logger.error({ error, jid, latitude, longitude }, 'Failed to send location message');
+      throw error;
+    }
   }
 
   /**
@@ -344,15 +447,31 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      contacts: {
-        displayName,
-        contacts: [{
+    try {
+      await this.socket.sendMessage(jid, {
+        contacts: {
           displayName,
-          vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${displayName}\nTEL;type=CELL;type=VOICE;waid=${phoneNumber.replace(/[^0-9]/g, '')}:${phoneNumber}\nEND:VCARD`
-        }]
+          contacts: [{
+            displayName,
+            vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${displayName}\nTEL;type=CELL;type=VOICE;waid=${phoneNumber.replace(/[^0-9]/g, '')}:${phoneNumber}\nEND:VCARD`
+          }]
+        }
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send contact';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
       }
-    });
+
+      this.logger.error({ error, jid, displayName }, 'Failed to send contact message');
+      throw error;
+    }
   }
 
   /**
@@ -363,13 +482,29 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      poll: {
-        name,
-        values,
-        selectableCount: multipleAnswers ? values.length : 1
+    try {
+      await this.socket.sendMessage(jid, {
+        poll: {
+          name,
+          values,
+          selectableCount: multipleAnswers ? values.length : 1
+        }
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send poll';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
       }
-    });
+
+      this.logger.error({ error, jid, name }, 'Failed to send poll message');
+      throw error;
+    }
   }
 
   /**
@@ -380,12 +515,28 @@ export class WhatsAppService {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
-    await this.socket.sendMessage(jid, {
-      react: {
-        text: reaction,
-        key
+    try {
+      await this.socket.sendMessage(jid, {
+        react: {
+          text: reaction,
+          key
+        }
+      });
+    } catch (error) {
+      const msgid = buildCompositeMsgId({
+        id: Date.now().toString(),
+        remoteJid: jid,
+        fromMe: true
+      });
+      const reason = error instanceof Error ? error.message : 'Failed to send reaction';
+
+      if (this.opts.tenantId) {
+        deliverOdooFailedMessage(this.opts.tenantId, msgid, reason);
       }
-    });
+
+      this.logger.error({ error, jid, reaction }, 'Failed to send reaction');
+      throw error;
+    }
   }
 
   /**

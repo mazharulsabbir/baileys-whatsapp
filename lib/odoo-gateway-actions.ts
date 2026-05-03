@@ -36,9 +36,59 @@ export async function handleMsgSetRead(
   return NextResponse.json({});
 }
 
-export async function handleContactGetAll(_userId: string): Promise<NextResponse> {
-  // Shape matches Connector.ca_get_chat_list; Baileys chat-store sync not wired here yet — sync happens via inbound webhook messages.
-  return NextResponse.json({ dialogs: [] as { id: string; name: string; image: string }[] });
+export async function handleContactGetAll(userId: string): Promise<NextResponse> {
+  const svc = getExistingService(userId);
+  const socket = svc?.getSocket() as
+    | (WASocket & {
+        chats?: {
+          all: () => Array<{ id: string; name?: string; }>;
+        };
+        profilePictureUrl?: (
+          jid: string,
+          type?: 'preview' | 'image',
+          timeoutMs?: number
+        ) => Promise<string | undefined>;
+      })
+    | null;
+
+  if (!socket) {
+    return NextResponse.json({ dialogs: [] });
+  }
+
+  try {
+    // Get all chats from Baileys store
+    const chats = socket.chats?.all() || [];
+
+    // Limit to first 100 contacts for performance
+    const dialogs = await Promise.all(
+      chats.slice(0, 100).map(async (chat) => {
+        const jid = chat.id;
+        const name = chat.name || jid.split('@')[0] || '';
+
+        // Try to get profile picture
+        let image = '';
+        try {
+          if (socket.profilePictureUrl) {
+            const url = await socket.profilePictureUrl(jid, 'preview');
+            image = url || '';
+          }
+        } catch {
+          // Profile picture not available
+        }
+
+        return {
+          id: jid.split('@')[0] || '',
+          name,
+          image
+        };
+      })
+    );
+
+    return NextResponse.json({ dialogs });
+  } catch (error) {
+    // Return empty on error
+    return NextResponse.json({ dialogs: [] });
+  }
 }
 
 export async function handleContactGet(

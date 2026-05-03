@@ -25,7 +25,12 @@ export async function postAcuxPayloadWithRetries(
     return { ok: false, error: 'empty payload' };
   }
 
-  const raw = JSON.stringify(body);
+  // Odoo expects payload wrapped in 'params' key
+  const wrappedBody = {
+    params: body
+  };
+
+  const raw = JSON.stringify(wrappedBody);
   let lastErr = 'unknown';
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -72,11 +77,33 @@ async function deliverToOdooWithDlq(
   body: AcuxWebhookBody
 ): Promise<void> {
   const url = await getOdooWebhookUrl(userId);
-  if (!url) return;
 
+  // Enhanced logging
+  console.log('[WEBHOOK DEBUG] deliverToOdooWithDlq called', {
+    userId,
+    webhookUrl: url,
+    hasMessages: (body.messages?.length ?? 0) > 0,
+    hasEvents: (body.events?.length ?? 0) > 0,
+    messageCount: body.messages?.length ?? 0
+  });
+
+  if (!url) {
+    console.warn('[WEBHOOK DEBUG] No webhook URL configured for user:', userId);
+    return;
+  }
+
+  console.log('[WEBHOOK DEBUG] Attempting POST to:', url);
   const result = await postAcuxPayloadWithRetries(url, body);
+
+  console.log('[WEBHOOK DEBUG] POST result:', {
+    ok: result.ok,
+    status: result.status,
+    error: result.error
+  });
+
   if (result.ok) return;
 
+  console.error('[WEBHOOK DEBUG] Webhook delivery failed, adding to DLQ:', result.error);
   await prisma.odooWebhookDeadLetter.create({
     data: {
       userId,
@@ -132,6 +159,28 @@ export function deliverAcuxMessageDeletes(
       messages: [],
       updates: [],
       events,
+    });
+  })();
+}
+
+/**
+ * Deliver failed message event to Odoo when message send fails.
+ * Odoo expects: { type: 'failed', msgid, reason }
+ */
+export function deliverOdooFailedMessage(
+  userId: string,
+  msgid: string,
+  reason: string
+): void {
+  void (async () => {
+    await deliverToOdooWithDlq(userId, {
+      messages: [],
+      updates: [],
+      events: [{
+        type: 'failed' as const,
+        msgid,
+        reason: reason || 'Unknown error'
+      }],
     });
   })();
 }
