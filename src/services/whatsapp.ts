@@ -114,6 +114,19 @@ export class WhatsAppService {
    */
   async connect(): Promise<void> {
     try {
+      if (this.socket) {
+        if (this.socket.user) {
+          this.logger.info('Already connected to WhatsApp');
+          return;
+        }
+        try {
+          this.socket.end(undefined);
+        } catch {
+          /* stale socket */
+        }
+        this.socket = null;
+      }
+
       // Load authentication state
       const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
 
@@ -198,7 +211,10 @@ export class WhatsAppService {
       () => {
         this.latestQr = null;
       },
-      this.opts.onConnectionState
+      this.opts.onConnectionState,
+      () => {
+        this.socket = null;
+      }
     );
 
     setupMessageHandler(
@@ -589,15 +605,39 @@ export class WhatsAppService {
   }
 
   /**
-   * Disconnect from WhatsApp
+   * Close the WhatsApp socket. Pass `{ logoutFromServer: true }` to notify WhatsApp (unlink linked device).
+   * Pass `{ removeCredentials: true }` to wipe `useMultiFileAuthState` files (required for a fresh QR on next Connect).
+   * Defaults preserve CLI-style shutdown (`end()` only, keep creds on disk).
    */
-  async disconnect(): Promise<void> {
+  async disconnect(options?: { logoutFromServer?: boolean; removeCredentials?: boolean }): Promise<void> {
+    const logoutFromServer = options?.logoutFromServer === true;
+    const removeCredentials = options?.removeCredentials === true;
+
     if (this.socket) {
-      this.socket.end(undefined);
+      try {
+        if (logoutFromServer) {
+          await Promise.race([
+            this.socket.logout(),
+            new Promise<void>((resolve) => setTimeout(resolve, 15_000)),
+          ]);
+        } else {
+          this.socket.end(undefined);
+        }
+      } catch (err) {
+        this.logger.warn({ err }, 'WhatsApp logout/end failed, closing socket');
+        try {
+          this.socket.end(undefined);
+        } catch {
+          /* ignore */
+        }
+      }
       this.socket = null;
-      this.latestQr = null;
-      this.logger.info('Disconnected from WhatsApp');
     }
+    this.latestQr = null;
+    if (removeCredentials) {
+      clearSession(this.authPath, this.logger);
+    }
+    this.logger.info('Disconnected from WhatsApp');
   }
 }
 

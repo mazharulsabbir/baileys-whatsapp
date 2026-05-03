@@ -11,6 +11,21 @@ export type AcuxWebhookBody = {
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 1000;
 
+const PREFIX = '[Odoo webhook]';
+
+function clip(s: string, max = 500): string {
+  const x = s.replace(/\s+/g, ' ').trim();
+  return x.length <= max ? x : `${x.slice(0, max)}…`;
+}
+
+/** Ensure fetch() accepts the URL (`localhost:8069/...` does not work without a scheme). */
+function normalizeWebhookUrl(raw: string): string | null {
+  const u = raw.trim();
+  if (!u) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) return u;
+  return `http://${u}`;
+}
+
 /** POST JSON to Odoo `acrux_webhook` with retries (exponential backoff). */
 export async function postAcuxPayloadWithRetries(
   webhookUrl: string,
@@ -22,22 +37,38 @@ export async function postAcuxPayloadWithRetries(
       (body.updates?.length ?? 0) >
     0;
   if (!hasPayload) {
+    console.warn(
+      PREFIX,
+      'skipped POST: empty payload (no messages/events/updates)'
+    );
     return { ok: false, error: 'empty payload' };
   }
 
-  // Odoo expects payload wrapped in 'params' key
-  const wrappedBody = {
-    params: body
-  };
+  const url = normalizeWebhookUrl(webhookUrl);
+  if (!url) {
+    console.error(PREFIX, 'invalid or empty webhook URL:', webhookUrl);
+    return { ok: false, error: 'invalid webhook URL' };
+  }
+  if (url !== webhookUrl.trim()) {
+    console.log(PREFIX, 'normalized URL (added scheme):', url);
+  }
 
+  // Older Odoo handlers expected JSON-RPC `params`; our controller accepts plain or wrapped bodies.
+  const wrappedBody = { params: body };
   const raw = JSON.stringify(wrappedBody);
   let lastErr = 'unknown';
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
+      console.log(PREFIX, `attempt ${attempt + 1}/${MAX_ATTEMPTS}`, '→', url, '| bytes=', raw.length, {
+        messages: body.messages?.length ?? 0,
+        events: body.events?.length ?? 0,
+        updates: body.updates?.length ?? 0,
+      });
+
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), 20_000);
-      const res = await fetch(webhookUrl, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,19 +79,33 @@ export async function postAcuxPayloadWithRetries(
       });
       clearTimeout(t);
 
+      const text = await res.text().catch(() => '');
+      console.log(
+        PREFIX,
+        'response',
+        res.status,
+        res.statusText,
+        '| ct=',
+        res.headers.get('content-type') ?? '(none)',
+        '| body=',
+        clip(text || '(empty)', 600)
+      );
+
       if (res.ok) {
         return { ok: true, status: res.status };
       }
 
-      lastErr = `${res.status} ${await res.text().catch(() => res.statusText)}`;
+      lastErr = `${res.status} ${text || res.statusText}`;
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e);
+      console.error(PREFIX, 'request failed:', lastErr);
     }
 
     const delay = BASE_DELAY_MS * Math.pow(2, attempt);
     await new Promise((r) => setTimeout(r, delay));
   }
 
+  console.error(PREFIX, 'giving up after', MAX_ATTEMPTS, 'attempts:', lastErr);
   return { ok: false, error: lastErr };
 }
 
@@ -78,32 +123,26 @@ async function deliverToOdooWithDlq(
 ): Promise<void> {
   const url = await getOdooWebhookUrl(userId);
 
-  // Enhanced logging
-  console.log('[WEBHOOK DEBUG] deliverToOdooWithDlq called', {
+  console.log(PREFIX, 'deliverToOdoo', {
     userId,
-    webhookUrl: url,
-    hasMessages: (body.messages?.length ?? 0) > 0,
-    hasEvents: (body.events?.length ?? 0) > 0,
-    messageCount: body.messages?.length ?? 0
+    webhookUrl: url ?? '(not set)',
+    messages: body.messages?.length ?? 0,
+    events: body.events?.length ?? 0,
+    updates: body.updates?.length ?? 0,
   });
 
   if (!url) {
-    console.warn('[WEBHOOK DEBUG] No webhook URL configured for user:', userId);
+    console.warn(PREFIX, 'skip: no webhook URL for user', userId);
     return;
   }
 
-  console.log('[WEBHOOK DEBUG] Attempting POST to:', url);
   const result = await postAcuxPayloadWithRetries(url, body);
 
-  console.log('[WEBHOOK DEBUG] POST result:', {
-    ok: result.ok,
-    status: result.status,
-    error: result.error
-  });
+  console.log(PREFIX, 'delivery finished', result);
 
   if (result.ok) return;
 
-  console.error('[WEBHOOK DEBUG] Webhook delivery failed, adding to DLQ:', result.error);
+  console.error(PREFIX, 'delivery failed → DLQ:', result.error);
   await prisma.odooWebhookDeadLetter.create({
     data: {
       userId,
@@ -123,7 +162,9 @@ export function deliverAcuxInboundRow(
     messages: [row],
     events: [],
     updates: [],
-  });
+  }).catch((e) =>
+    console.error(PREFIX, 'Unhandled error in inbound delivery:', e)
+  );
 }
 
 /** WhatsApp connection → Odoo `phone-status`. */
@@ -138,7 +179,9 @@ export function deliverOdooPhoneStatus(
       updates: [],
       events: [{ type: 'phone-status', status }],
     });
-  })();
+  })().catch((e) =>
+    console.error(PREFIX, 'Unhandled error in phone-status delivery:', e)
+  );
 }
 
 /** WhatsApp revoked messages → Odoo `deleted` event (`msgid` = composite id). */
@@ -161,7 +204,9 @@ export function deliverAcuxMessageDeletes(
       updates: [],
       events,
     });
-  })();
+  })().catch((e) =>
+    console.error(PREFIX, 'Unhandled error in delete-event delivery:', e)
+  );
 }
 
 /**
@@ -183,7 +228,9 @@ export function deliverOdooFailedMessage(
         reason: reason || 'Unknown error'
       }],
     });
-  })();
+  })().catch((e) =>
+    console.error(PREFIX, 'Unhandled error in failed-message delivery:', e)
+  );
 }
 
 export async function listOdooDeadLetters(userId: string, limit = 20) {

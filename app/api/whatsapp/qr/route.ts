@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { auth } from '@/auth';
 import { hasActiveEntitlement } from '@/lib/entitlement';
-import { getExistingService } from '@/lib/whatsapp-registry';
+import { getExistingService, scheduleSessionRestore } from '@/lib/whatsapp-registry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,8 @@ export async function GET() {
   if (!entitled) {
     return NextResponse.json({ error: 'Active subscription required' }, { status: 403 });
   }
+
+  scheduleSessionRestore(session.user.id);
 
   const svc = getExistingService(session.user.id);
   if (!svc) {

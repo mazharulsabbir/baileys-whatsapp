@@ -45,18 +45,25 @@ class WebhookController(http.Controller):
         return Response(txt, status=200)
 
     @http.route('/acrux_webhook/whatsapp_connector/<string:connector_uuid>',
-                auth='public', type='json', methods=['POST'])
+                auth='public', type='http', methods=['POST'], csrf=False)
     def acrux_webhook(self, connector_uuid, **post):
-        ''' Keeping "Account ID" secret. '''
+        ''' POST JSON: flat ``{messages,events,updates}`` or wrapped in ``params`` (JSON-RPC). '''
         try:
-            print(post)
-            if not post:
-                return Response(status=403)  # Forbidden
-            log_request(request)
+            payload = {}
+            raw = request.httprequest.data
+            if raw:
+                try:
+                    body = json.loads(raw.decode(request.httprequest.charset or 'utf-8'))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    return Response(status=400)
+                if isinstance(body, dict):
+                    inner = body.get('params')
+                    payload = inner if isinstance(inner, dict) else body
+            updates = payload.get('updates') or []
+            events = payload.get('events') or []
+            messages = payload.get('messages') or []
 
-            updates = post.get('updates', [])
-            events = post.get('events', [])
-            messages = post.get('messages', [])
+            log_request(request)
             if not updates and not events and not messages:
                 return Response(status=403)  # Forbidden
 

@@ -1,7 +1,6 @@
 import {
   WASocket,
   DisconnectReason,
-  proto
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -19,7 +18,8 @@ export function setupConnectionHandler(
   onQr?: (qr: string) => void,
   autoReconnectEnabled: boolean = config.autoReconnect,
   onConnectionOpen?: () => void,
-  onConnectionState?: (state: 'open' | 'close') => void
+  onConnectionState?: (state: 'open' | 'close') => void,
+  onDisconnected?: () => void
 ): void {
   let restartRequiredCount = 0;
   const MAX_RESTART_ATTEMPTS = 2;
@@ -36,6 +36,7 @@ export function setupConnectionHandler(
 
     // Handle connection status
     if (connection === 'close') {
+      onDisconnected?.();
       onConnectionState?.('close');
       logger.warn('Connection closed');
 
@@ -57,7 +58,23 @@ export function setupConnectionHandler(
         }
       }
       
+      const replaced = statusCode === DisconnectReason.connectionReplaced;
+      if (replaced) {
+        logger.error(
+          'Session was replaced on WhatsApp Multi-Device (another Web/client opened the same account). ' +
+            'Auto-reconnect would loop: stop duplicate Baileys/processes, unlink other Linked Devices, then reconnect once.'
+        );
+      }
+
       const shouldReconnect = shouldReconnectOnDisconnect(statusCode);
+
+      const mustClearStoredCreds =
+        statusCode === DisconnectReason.loggedOut ||
+        statusCode === DisconnectReason.badSession;
+      if (mustClearStoredCreds) {
+        logger.warn({ statusCode, reasonName: getDisconnectReason(statusCode) }, 'Clearing stored credentials');
+        clearSessionCallback?.();
+      }
 
       if (shouldReconnect && autoReconnectEnabled) {
         logger.info('Reconnecting...');
@@ -73,9 +90,9 @@ export function setupConnectionHandler(
           reasonName: getDisconnectReason(statusCode)
         }, 'Disconnected');
 
-        // Clear session if logged out
+        // Session already cleared for loggedOut / badSession above
         if (statusCode === DisconnectReason.loggedOut) {
-          logger.warn('Session logged out. Clear credentials and re-scan QR.');
+          logger.warn('Session ended from phone (device unlinked). Scan QR again to pair.');
         }
       }
     } else if (connection === 'open') {
@@ -105,10 +122,10 @@ export function setupConnectionHandler(
 function shouldReconnectOnDisconnect(statusCode: number | undefined): boolean {
   if (!statusCode) return true;
 
+  /** Do not reconnect on connectionReplaced — WA opened another session for this number; reconnecting fights it and loops. */
   const reconnectReasons = [
     DisconnectReason.connectionClosed,
     DisconnectReason.connectionLost,
-    DisconnectReason.connectionReplaced,
     DisconnectReason.restartRequired,
     DisconnectReason.timedOut,
     DisconnectReason.badSession,

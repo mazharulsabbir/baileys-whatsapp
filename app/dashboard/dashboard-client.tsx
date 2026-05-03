@@ -69,6 +69,7 @@ export function DashboardClient({ email, entitlement, hasActive }: Props) {
       await fetch('/api/whatsapp/disconnect', { method: 'POST' });
       setConnected(false);
       setQrDataUrl(null);
+      await pollQr();
     } finally {
       setDisconnecting(false);
     }
@@ -123,7 +124,8 @@ export function DashboardClient({ email, entitlement, hasActive }: Props) {
             <>
               <p className="dashboard-muted">
                 Open WhatsApp on your phone → Linked devices → Link a device, then scan the QR below. This creates a
-                persistent session for your tenant until you disconnect or revoke from the phone.
+                persistent session for your tenant until you disconnect or revoke from the phone. If you unlink this
+                device on the phone, the dashboard switches to disconnected within a couple of seconds.
               </p>
               <div className="whatsapp-actions">
                 <button type="button" onClick={() => void connect()} disabled={connecting}>
