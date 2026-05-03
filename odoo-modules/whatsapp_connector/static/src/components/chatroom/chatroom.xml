@@ -3,21 +3,24 @@
 
     <t t-name="chatroom.Chatroom" owl="1">
         <div class="o_Chatroom" t-ref="chatroomRef">
-            <div class="o_sidebar o_sidebar_left col-12 col-md-4 col-lg-3 col-xl-3 col-xxl-3"
-                t-attf-class="{{ state.currentMobileSide and firtSideMobile }}">
+            <div t-attf-class="{{ leftColumnClasses }}">
                 <ConversationList conversations="state.conversations"
                     selectedConversation="state.selectedConversation"
                     mobileNavigate="() => this.env.chatBus.trigger('mobileNavigate', 'middleSide')" />
             </div>
             <div class="o_sidebar o_sidebar_content col-12 col-md-8"
-                t-attf-class="col-lg-{{4 + chatroomTabSize}} col-xl-{{4 + chatroomTabSize}} col-xxl-{{5 + chatroomTabSize}}
-                    {{ state.currentMobileSide and middleSideMobile }}">
+                t-attf-class="{{ middleColumnClasses }} {{ state.currentMobileSide and middleSideMobile }}">
                 <ChatroomHeader>
                     <i class="navbar-toggler-left d-md-none text-primary fa fa-chevron-circle-left"
                         t-on-click="() => this.env.chatBus.trigger('mobileNavigate', 'firstSide')" />
                     <ConversationHeader selectedConversation="state.selectedConversation" />
                     <i class="navbar-toggler-right d-lg-none text-primary fa fa-chevron-circle-right"
                         t-on-click="() => this.env.chatBus.trigger('mobileNavigate', 'lastSide')" />
+                    <button type="button" class="btn btn-sm btn-link text-muted px-1 d-none d-lg-inline-flex align-items-center"
+                        t-att-title="focusToggleTitle"
+                        t-on-click="cycleFocusChat">
+                        <i t-attf-class="fa {{ focusToggleIcon }}"/>
+                    </button>
                     <div class="d-lg-flex d-none">
                       <button class="btn left-btn" t-att-title="'Reduce'"
                         t-on-click="changeTabSize" t-if="chatroomTabSize &gt; -2">
@@ -29,13 +32,15 @@
                       </button>
                     </div>
                 </ChatroomHeader>
-                <ConversationThread selectedConversation="state.selectedConversation" />
+                <div class="o_Chatroom_thread_wrap">
+                    <ConversationThread selectedConversation="state.selectedConversation" />
+                </div>
                 <Toolbox selectedConversation="state.selectedConversation"
-                    user="state.user" />
+                    user="state.user"
+                    defaultAnswers="defaultAnswers" />
             </div>
             <div class="o_sidebar o_sidebar_right"
-                t-attf-class="col-lg-{{5 - chatroomTabSize}} col-xl-{{5 - chatroomTabSize}} col-xxl-{{4 - chatroomTabSize}}
-                    {{ state.currentMobileSide and lastSideMobile }}">
+                t-attf-class="{{ rightColumnClasses }} {{ state.currentMobileSide and lastSideMobile }}">
                 <ChatroomHeader className="'d-lg-none'">
                     <i class="navbar-toggler-left text-primary fa fa-chevron-circle-left"
                         t-on-click="() => this.env.chatBus.trigger('mobileNavigate', 'middleSide')" />

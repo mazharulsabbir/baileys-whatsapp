@@ -11,6 +11,7 @@ import { updateOdooConfigSet } from '@/lib/odoo-gateway-credential';
 import { recordApiUsage } from '@/lib/api-usage';
 import { rateLimit } from '@/lib/rate-limit';
 import { normalizeToJid } from '@/lib/jid';
+import { fetchOdooMediaBuffer, rasterToJpegForWhatsApp } from '@/lib/odoo-media-fetch';
 import { ensureConnecting, getExistingService, disconnectTenant } from '@/lib/whatsapp-registry';
 import type { WhatsAppService } from '@/src/services/whatsapp';
 import {
@@ -103,14 +104,58 @@ const configSetSchema = z.object({
   info: z.record(z.string(), z.unknown()).optional(),
 });
 
-const sendTextSchema = z.object({
-  type: z.literal('text'),
-  text: z.string().min(1),
+/** Fields Odoo adds to every outbound payload (`acrux.chat.message.message_parse`). */
+const sendCommonSchema = z.object({
   to: z.string().min(3),
   chat_type: z.string().optional(),
   id: z.union([z.string(), z.number()]).optional(),
   quote_msg_id: z.string().optional(),
 });
+
+const sendTextSchema = sendCommonSchema.extend({
+  type: z.literal('text'),
+  text: z.string().min(1),
+});
+
+/** Product drag-drop / attachments use `image` + public attachment URL + optional caption (`text`). */
+const sendImageSchema = sendCommonSchema.extend({
+  type: z.literal('image'),
+  url: z.string().url(),
+  filename: z.string().optional(),
+  text: z.string().optional(),
+});
+
+const sendVideoSchema = sendCommonSchema.extend({
+  type: z.literal('video'),
+  url: z.string().url(),
+  filename: z.string().optional(),
+  text: z.string().optional(),
+});
+
+const sendFileSchema = sendCommonSchema.extend({
+  type: z.literal('file'),
+  url: z.string().url(),
+  filename: z.string().optional(),
+  text: z.string().optional(),
+});
+
+const sendAudioSchema = sendCommonSchema.extend({
+  type: z.literal('audio'),
+  url: z.string().url(),
+});
+
+const sendPayloadSchema = z.discriminatedUnion('type', [
+  sendTextSchema,
+  sendImageSchema,
+  sendVideoSchema,
+  sendFileSchema,
+  sendAudioSchema,
+]);
+
+function captionFromOdoo(text: string | undefined): string | undefined {
+  const t = text?.trim();
+  return t ? t : undefined;
+}
 
 /**
  * Single entry: Odoo `ca_request` — same URL, `action` header routes behavior.
@@ -192,7 +237,7 @@ export async function dispatchGatewayRequest(req: Request): Promise<NextResponse
 
       case 'send': {
         const body = await readJsonBody(req);
-        const parsed = sendTextSchema.safeParse(body);
+        const parsed = sendPayloadSchema.safeParse(body);
         if (!parsed.success) {
           return NextResponse.json(
             { error: 'Validation failed', details: parsed.error.flatten() },
@@ -213,7 +258,37 @@ export async function dispatchGatewayRequest(req: Request): Promise<NextResponse
 
         try {
           const jid = normalizeToJid(parsed.data.to);
-          const msgId = await svc.sendMessage(jid, parsed.data.text);
+          let msgId: string | undefined;
+          switch (parsed.data.type) {
+            case 'text':
+              msgId = await svc.sendMessage(jid, parsed.data.text);
+              break;
+            case 'image':
+              {
+                const raw = await fetchOdooMediaBuffer(parsed.data.url);
+                const jpeg = await rasterToJpegForWhatsApp(raw);
+                msgId = await svc.sendImage(jid, jpeg, captionFromOdoo(parsed.data.text));
+              }
+              break;
+            case 'video':
+              msgId = await svc.sendVideo(jid, parsed.data.url, captionFromOdoo(parsed.data.text));
+              break;
+            case 'file':
+              msgId = await svc.sendDocument(
+                jid,
+                parsed.data.url,
+                parsed.data.filename,
+                captionFromOdoo(parsed.data.text)
+              );
+              break;
+            case 'audio':
+              msgId = await svc.sendAudio(jid, parsed.data.url);
+              break;
+            default: {
+              const _exhaustive: never = parsed.data;
+              return jsonError(`Unsupported send type: ${JSON.stringify(_exhaustive)}`, 400);
+            }
+          }
           void recordApiUsage(userId, 'messages');
           if (!msgId) {
             return NextResponse.json({ msg_id: `pending_${Date.now()}` });

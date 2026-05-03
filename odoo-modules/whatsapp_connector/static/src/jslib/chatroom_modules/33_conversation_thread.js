@@ -1,6 +1,8 @@
-odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@odoo/owl', '@web/core/utils/hooks', '@whatsapp_connector/chatroom_mod/story-dialog', '@whatsapp_connector/chatroom_mod/conversation-model'], function (require) {
-    'use strict'; let __exports = {}; const { Component, useRef, onWillUpdateProps, onPatched, onMounted } = require('@odoo/owl')
+odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@web/core/l10n/translation', '@odoo/owl', '@web/core/utils/hooks', '@web/core/browser/browser', '@whatsapp_connector/chatroom_mod/story-dialog', '@whatsapp_connector/chatroom_mod/conversation-model'], function (require) {
+    'use strict'; let __exports = {}; const { _t } = require('@web/core/l10n/translation')
+    const { Component, useRef, onWillUpdateProps, onPatched, onMounted } = require('@odoo/owl')
     const { useBus } = require('@web/core/utils/hooks')
+    const { browser } = require('@web/core/browser/browser')
     const { Message } = require('@whatsapp_connector/chatroom_mod/story-dialog')
     const { ConversationModel } = require('@whatsapp_connector/chatroom_mod/conversation-model')
     const ConversationThread = __exports.ConversationThread = class ConversationThread extends Component {
@@ -21,6 +23,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@odoo/owl'
             onMounted(this.checkScroll.bind(this))
             onPatched(this.checkScroll.bind(this))
         }
+        get emptyThreadHint() { return _t('No messages yet. Send one below.') }
         async willUpdateProps() {
             this.loadMoreMessage = false
             this.firstScroll = true
@@ -64,13 +67,13 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@odoo/owl'
             return scrollPosition
         }
         scrollConversation() {
-            if (this.threadRef.el) {
-                const list = this.threadRef.el.querySelectorAll('.acrux_Message')
-                if (list.length) {
-                    const lastMessage = list[list.length - 1]
-                    if (lastMessage) { setTimeout(() => lastMessage.scrollIntoView({ block: 'nearest', inline: 'start' }), 30) }
-                }
+            if (!this.threadRef.el) {
+                return
             }
+            const el = this.threadRef.el
+            browser.setTimeout(() => {
+                el.scrollTop = el.scrollHeight
+            }, 0)
         }
         scrollToMessage({ detail: { message, effect, className } }) {
             if (this.threadRef.el) {

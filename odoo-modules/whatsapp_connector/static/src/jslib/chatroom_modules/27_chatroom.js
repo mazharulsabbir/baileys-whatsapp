@@ -55,7 +55,17 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
         }
         getInitState() {
             const chatroomTabSize = parseInt(browser.localStorage.getItem('chatroomTabSize') || '0')
-            return { user: new UserModel(this), selectedConversation: null, conversations: [], currentMobileSide: '', renderForms: false, chatroomTabSize, tabSelected: this.props.tabSelected || 'tab_default_answer', }
+            let focusMode = 0
+            const fmStored = browser.localStorage.getItem('chatroomFocusMode')
+            if (fmStored !== null && fmStored !== '') {
+                const n = parseInt(fmStored, 10)
+                if (!Number.isNaN(n) && n >= 0 && n <= 2) {
+                    focusMode = n
+                }
+            } else if (browser.localStorage.getItem('chatroomFocusChatOnly') === '1') {
+                focusMode = 1
+            }
+            return { user: new UserModel(this), selectedConversation: null, conversations: [], currentMobileSide: '', renderForms: false, chatroomTabSize, tabSelected: this.props.tabSelected || 'tab_default_answer', focusMode, }
         }
         getSubEnv() { return { context: this.props.action.context, chatBus: new EventBus(), chatModel: 'acrux.chat.conversation', getCurrency: () => this.currencyId, chatroomJsId: this.props.action.jsId, getShowUser: () => this.showUserInMessage, canTranscribe: () => this.canTranscribe, canTranslate: () => this.canTranslate, getCurrentLang: () => this.currentLang, isVerticalView: () => this.state.user?.tabOrientation === 'vertical', isAdmin: () => this.isAdmin, } }
         async willStart() {
@@ -308,6 +318,67 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
         updateTab({ detail: tabId }) {
             if (this.myController) { this.myController.props.tabSelected = tabId }
             this.state.tabSelected = tabId
+        }
+        get leftColumnClasses() {
+            let out = 'o_sidebar o_sidebar_left col-12 col-md-4 col-lg-3 col-xl-3 col-xxl-3'
+            if (this.state.focusMode === 2 && this.env.services.ui.size >= SIZES.LG) {
+                out += ' d-none'
+            }
+            if (this.state.currentMobileSide && this.firtSideMobile) {
+                out += ` ${this.firtSideMobile}`
+            }
+            return out
+        }
+        get middleColumnClasses() {
+            const ui = this.env.services.ui.size
+            const base = 'o_sidebar o_sidebar_content col-12 col-md-8'
+            const lg = ui >= SIZES.LG
+            const fm = this.state.focusMode
+            if (!lg) {
+                const t = this.chatroomTabSize
+                return `${base} col-lg-${4 + t} col-xl-${4 + t} col-xxl-${5 + t}`
+            }
+            if (fm === 2) {
+                return `${base} col-lg-12 col-xl-12 col-xxl-12`
+            }
+            if (fm === 1) {
+                return `${base} col-lg-9 col-xl-9 col-xxl-9`
+            }
+            const t = this.chatroomTabSize
+            return `${base} col-lg-${4 + t} col-xl-${4 + t} col-xxl-${5 + t}`
+        }
+        get rightColumnClasses() {
+            const ui = this.env.services.ui.size
+            const base = 'o_sidebar o_sidebar_right'
+            if (ui >= SIZES.LG && this.state.focusMode >= 1) {
+                return `${base} d-none`
+            }
+            const t = this.chatroomTabSize
+            return `${base} col-lg-${5 - t} col-xl-${5 - t} col-xxl-${4 - t}`
+        }
+        cycleFocusChat() {
+            this.state.focusMode = (this.state.focusMode + 1) % 3
+            browser.localStorage.setItem('chatroomFocusMode', String(this.state.focusMode))
+        }
+        get focusToggleTitle() {
+            switch (this.state.focusMode) {
+                case 0:
+                    return _t('Hide side panel (wider chat)')
+                case 1:
+                    return _t('Hide conversation list (full width)')
+                default:
+                    return _t('Restore normal layout')
+            }
+        }
+        get focusToggleIcon() {
+            switch (this.state.focusMode) {
+                case 0:
+                    return 'fa-expand'
+                case 1:
+                    return 'fa-columns'
+                default:
+                    return 'fa-compress'
+            }
         }
         changeTabSize(event) {
             const target = event.currentTarget || event.target

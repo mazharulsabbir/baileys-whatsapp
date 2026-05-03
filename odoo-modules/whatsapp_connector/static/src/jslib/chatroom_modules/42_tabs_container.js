@@ -13,13 +13,37 @@ odoo.define('@whatsapp_connector/chatroom_mod/tabs-container', ['@web/core/l10n/
     const { DefaultAnswerModel } = require('@whatsapp_connector/chatroom_mod/default-answer-model')
     const { ProductContainer } = require('@whatsapp_connector/chatroom_mod/product-container')
     const { UserModel } = require('@whatsapp_connector/chatroom_mod/user-model')
+    /** Odoo uses false for empty Many2one; Owl Number props reject false — omit / pass undefined instead. */
+    function chatroomFormResId(raw) {
+        if (raw === undefined || raw === null || raw === false) {
+            return undefined
+        }
+        const n = typeof raw === 'number' ? raw : parseInt(raw, 10)
+        return Number.isFinite(n) && n > 0 ? n : undefined
+    }
+    __exports.chatroomFormResId = chatroomFormResId
     const TabsContainer = __exports.TabsContainer = class TabsContainer extends Component {
         setup() {
             super.setup()
             this.env; this.props
         }
-        get tabPartnerFormProps() { return { viewTitle: _t('Partner'), viewResId: this.props.selectedConversation?.partner?.id, searchButton: true, searchButtonString: _t('Search Existing'), selectedConversation: this.props.selectedConversation, } }
-        get tabConversationFormProps() { return { viewId: this.props.conversationInfoForm, viewTitle: _t('Info'), viewResId: this.props.selectedConversation?.id, selectedConversation: this.props.selectedConversation, } }
+        get tabPartnerFormProps() {
+            return {
+                viewTitle: _t('Partner'),
+                viewResId: chatroomFormResId(this.props.selectedConversation?.partner?.id),
+                searchButton: true,
+                searchButtonString: _t('Search Existing'),
+                selectedConversation: this.props.selectedConversation,
+            }
+        }
+        get tabConversationFormProps() {
+            return {
+                viewId: this.props.conversationInfoForm,
+                viewTitle: _t('Info'),
+                viewResId: chatroomFormResId(this.props.selectedConversation?.id),
+                selectedConversation: this.props.selectedConversation,
+            }
+        }
         get tabConversationKanbanProps() { return { viewId: this.props.conversationKanban, viewTitle: _t('Status'), formViewId: this.props.conversationInfoForm, selectedConversation: this.props.selectedConversation, } }
         get tabConversationPanelFormProps() { return { viewId: this.props.conversationPanelForm, viewTitle: _t('Panel'), } }
         get tabAiIntefaceFormProps() { return { viewId: this.props.aiIntefaceForm, viewTitle: _t('AI'), selectedConversation: this.props.selectedConversation, } }

@@ -1,5 +1,5 @@
-odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/browser', '@web/core/checkbox/checkbox', '@web/core/utils/hooks', '@web/core/transition', '@web/core/select_menu/select_menu', '@odoo/owl', '@whatsapp_connector/chatroom_mod/emojis', '@whatsapp_connector/chatroom_mod/activity-button', '@whatsapp_connector/chatroom_mod/use-attachment-uploader', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/message-model', '@whatsapp_connector/chatroom_mod/user-model', '@whatsapp_connector/chatroom_mod/attachment-list', '@whatsapp_connector/chatroom_mod/file-uploader', '@whatsapp_connector/chatroom_mod/story-dialog'], function (require) {
-    'use strict'; let __exports = {}; const { browser } = require('@web/core/browser/browser')
+odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/browser', '@web/core/checkbox/checkbox', '@web/core/utils/hooks', '@web/core/transition', '@web/core/select_menu/select_menu', '@web/core/l10n/translation', '@odoo/owl', '@whatsapp_connector/chatroom_mod/emojis', '@whatsapp_connector/chatroom_mod/activity-button', '@whatsapp_connector/chatroom_mod/use-attachment-uploader', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/message-model', '@whatsapp_connector/chatroom_mod/user-model', '@whatsapp_connector/chatroom_mod/attachment-list', '@whatsapp_connector/chatroom_mod/file-uploader', '@whatsapp_connector/chatroom_mod/story-dialog'], function (require) {
+    'use strict'; let __exports = {}; const { _t } = require('@web/core/l10n/translation'); const { browser } = require('@web/core/browser/browser')
     const { CheckBox } = require('@web/core/checkbox/checkbox')
     const { useAutofocus } = require('@web/core/utils/hooks')
     const { Transition } = require('@web/core/transition')
@@ -37,12 +37,66 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
             useAutofocus('inputRef')
             onWillStart(this.willStart.bind(this))
             useEffect(this.enableDisplabeAttachBtn.bind(this), () => [this.state.attachments])
+            useEffect(() => {
+                const convId = this.props.selectedConversation?.id
+                if (convId && this.inputRef.el) {
+                    this.restoreDraftForConversation(convId)
+                }
+            }, () => [this.props.selectedConversation?.id])
             onWillUpdateProps(async (props) => {
+                const prevId = this.props?.selectedConversation?.id
+                const nextId = props?.selectedConversation?.id
+                if (prevId && prevId !== nextId) {
+                    this.saveDraftForConversation(prevId)
+                }
                 await this.updateLangs(props)
                 if (this.props?.selectedConversation !== props?.selectedConversation) { this.env.chatBus.trigger('quoteMessage', null) }
             })
         }
-        getInitState() { return { attachments: [], showTraductor: browser.localStorage.getItem('chatroomShowTraductor') === 'true', lang: undefined, message: null, } }
+        draftStorageKey(convId) { return `acrux_chatroom_draft_${convId}` }
+        saveDraftForConversation(convId) {
+            if (!convId || !this.inputRef.el) { return }
+            sessionStorage.setItem(this.draftStorageKey(convId), this.inputRef.el.value)
+            if (this.inputLangRef.el) {
+                sessionStorage.setItem(`${this.draftStorageKey(convId)}_lang`, this.inputLangRef.el.value)
+            }
+        }
+        restoreDraftForConversation(convId) {
+            if (!convId || !this.inputRef.el) { return }
+            const main = sessionStorage.getItem(this.draftStorageKey(convId)) || ''
+            const lang = sessionStorage.getItem(`${this.draftStorageKey(convId)}_lang`) || ''
+            this.env.chatBus.trigger('setInputText', [main, lang])
+        }
+        clearDraftForConversation(convId) {
+            if (!convId) { return }
+            sessionStorage.removeItem(this.draftStorageKey(convId))
+            sessionStorage.removeItem(`${this.draftStorageKey(convId)}_lang`)
+        }
+        scheduleDraftSave() {
+            const convId = this.props.selectedConversation?.id
+            if (!convId || !this.inputRef.el) { return }
+            browser.clearTimeout(this._draftSaveTimer)
+            this._draftSaveTimer = browser.setTimeout(() => {
+                this._draftSaveTimer = null
+                this.saveDraftForConversation(convId)
+            }, 320)
+        }
+        get snippetChips() {
+            const answers = this.props.defaultAnswers || []
+            return [...answers].sort((a, b) => (a.sequence || 0) - (b.sequence || 0)).slice(0, 8)
+        }
+        insertSnippet(answer) {
+            if (!answer?.text || !this.inputRef.el) { return }
+            const chunk = String(answer.text).trim()
+            if (!chunk) { return }
+            const cur = this.inputRef.el.value
+            const spacer = cur && !cur.endsWith('\n') ? '\n' : ''
+            const langVal = this.inputLangRef.el ? this.inputLangRef.el.value : undefined
+            this.env.chatBus.trigger('setInputText', [`${cur}${spacer}${chunk}`, langVal])
+            this.inputRef.el.focus()
+            this.scheduleDraftSave()
+        }
+        getInitState() { return { attachments: [], showTraductor: browser.localStorage.getItem('chatroomShowTraductor') === 'true', lang: undefined, message: null, isSending: false, } }
         async willStart() {
             const { orm } = this.env.services
             const data = await orm.call(this.env.chatModel, 'check_object_reference', ['', 'acrux_chat_message_wizard_action'], { context: this.context })
@@ -82,9 +136,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
         async blockClient() { if (this.props.selectedConversation) { try { await this.props.selectedConversation.block() } catch (_e) { } } }
         async releaseClient() { if (this.props.selectedConversation?.isCurrent()) { await this.props.selectedConversation.release() } }
         async sendMessage(event) {
-            this.inputRef.el.disabled = true
-            this.sendBtnRef.el.disabled = true
-            if (this.inputLangRef.el) { this.inputLangRef.el.disabled = true }
+            const convId = this.props.selectedConversation?.id
             const outMessages = []
             let options = { from_me: true }, firstAttach
             let text = this.inputRef.el.value.trim()
@@ -105,30 +157,47 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
                 firstAttach = attachments.shift()
                 options = this.setAttachmentValues2Message(options, firstAttach)
             }
+            if (!options.ttype) {
+                return outMessages
+            }
+            this.inputRef.el.disabled = true
+            this.sendBtnRef.el.disabled = true
+            if (this.inputLangRef.el) { this.inputLangRef.el.disabled = true }
+            this.state.isSending = true
             try {
-                this.env.services.ui.block()
-                if (options.ttype) {
+                options = this.sendMessageHook(options)
+                outMessages.push(await this.props.selectedConversation.createMessage(options))
+                await this.postCreateMessage(outMessages[outMessages.length - 1])
+                if (options.res_model === 'ir.attachment') { attachmentsSent.push(options.res_model_obj) }
+                text = traduction = ''
+                for await (const attachment of attachments) {
+                    options = this.setAttachmentValues2Message({ from_me: true }, attachment)
                     options = this.sendMessageHook(options)
                     outMessages.push(await this.props.selectedConversation.createMessage(options))
                     await this.postCreateMessage(outMessages[outMessages.length - 1])
-                    if (options.res_model === 'ir.attachment') { attachmentsSent.push(options.res_model_obj) }
-                    text = traduction = ''
-                    for await (const attachment of attachments) {
-                        options = this.setAttachmentValues2Message({ from_me: true }, attachment)
-                        options = this.sendMessageHook(options)
-                        outMessages.push(await this.props.selectedConversation.createMessage(options))
-                        await this.postCreateMessage(outMessages[outMessages.length - 1])
-                        attachmentsSent.push(attachment)
-                    }
+                    attachmentsSent.push(attachment)
                 }
+                if (convId) {
+                    this.clearDraftForConversation(convId)
+                }
+            } catch (e) {
+                console.error(e)
+                let errText = _t('Could not send the message.')
+                const raw = e?.data?.message
+                if (raw) {
+                    errText = Array.isArray(raw) ? raw.join(' ') : raw
+                } else if (e?.message) {
+                    errText = e.message
+                }
+                this.env.services.notification.add(errText, { type: 'danger' })
             } finally {
+                this.state.isSending = false
                 this.inputRef.el.disabled = false
                 this.sendBtnRef.el.disabled = false
                 if (this.inputLangRef.el) { this.inputLangRef.el.disabled = false }
                 this.state.attachments = [firstAttach, ...attachments].filter(attach => attach && !attachmentsSent.includes(attach))
                 this.enableDisplabeAttachBtn()
                 this.env.chatBus.trigger('setInputText', [text, traduction])
-                this.env.services.ui.unblock()
             }
             return outMessages
         }
@@ -153,24 +222,111 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
             if (this.state.message) { options.quote_id = this.state.message.exportToJson() }
             return options
         }
-        onKeypress(event) {
-            if (event.which === 13 && !event.shiftKey) {
+        onComposerKeydown(event) {
+            if (event.key === 'Escape') {
+                this.env.chatBus.trigger('quoteMessage', null)
+                return
+            }
+            if (event.key !== 'Enter' || event.shiftKey) {
+                return
+            }
+            const raw = (this.inputRef.el?.value || '').trim()
+            if (raw.startsWith('/') && this.trySlashCommand(raw)) {
                 event.preventDefault()
                 event.stopPropagation()
-                if (event.currentTarget.classList.contains('o_chat_toolbox_text_translated')) { this.onTranslate().then(() => this.inputRef.el.focus()) } else { this.sendMessage() }
+                return
+            }
+            event.preventDefault()
+            event.stopPropagation()
+            if (!this.state.isSending) {
+                this.sendMessage(event)
             }
         }
-        onKeydown(event) { if (event.which === 27) { this.env.chatBus.trigger('quoteMessage', null) } }
-        onInput(event) {
-            const { target: textarea } = event
+        trySlashCommand(raw) {
+            const body = raw.startsWith('/') ? raw.slice(1).trim() : raw.trim()
+            const cmd = body.split(/\s+/).filter(Boolean)[0]
+            if (!cmd) {
+                return false
+            }
+            const key = cmd.toLowerCase()
+            const clearComposer = () => {
+                const langVal = this.inputLangRef.el ? this.inputLangRef.el.value : ''
+                this.env.chatBus.trigger('setInputText', [ '', langVal ])
+            }
+            const openSideTab = (tabKey) => {
+                this.env.chatBus.trigger('selectTab', tabKey)
+                this.env.chatBus.trigger('mobileNavigate', 'lastSide')
+                clearComposer()
+                return true
+            }
+            switch (key) {
+                case 'help':
+                case '?':
+                    this.env.services.notification.add(
+                        _t('Shortcuts: /partner /info /defaults /template /products /ai /panel /kanban'),
+                        { type: 'info' },
+                    )
+                    clearComposer()
+                    return true
+                case 'p':
+                case 'partner':
+                    return openSideTab('tab_partner')
+                case 'i':
+                case 'info':
+                    return openSideTab('tab_conv_info')
+                case 'd':
+                case 'defaults':
+                case 'snippets':
+                    return openSideTab('tab_default_answer')
+                case 't':
+                case 'template':
+                    clearComposer()
+                    if (!this.props.selectedConversation?.id) {
+                        this.env.services.notification.add(_t('Select a conversation first.'), { type: 'warning' })
+                        return true
+                    }
+                    void this.sendWizard()
+                    return true
+                case 'products':
+                case 'cubes':
+                    return openSideTab('tab_product_grid')
+                case 'ai':
+                    return openSideTab('tab_ai_inteface')
+                case 'panel':
+                case 'activities':
+                    return openSideTab('tab_conv_panel')
+                case 'kanban':
+                case 'funnel':
+                    return openSideTab('tab_conv_kanban')
+                default:
+                    return false
+            }
+        }
+        onTranslateFieldKeydown(event) {
+            if (event.key !== 'Enter' || event.shiftKey) {
+                return
+            }
+            event.preventDefault()
+            event.stopPropagation()
+            this.onTranslate().then(() => this.inputRef.el?.focus())
+        }
+        resizeTextarea(textarea, maxPx) {
             if (textarea.value.trim()) {
                 textarea.style.height = 'auto'
                 const newHeight = textarea.scrollHeight - (textarea.offsetHeight - textarea.clientHeight)
-                textarea.style.height = Math.min(newHeight, 60) + 'px'; textarea.style.overflow = (newHeight > 60) ? 'auto' : 'hidden'
+                textarea.style.height = Math.min(newHeight, maxPx) + 'px'
+                textarea.style.overflow = (newHeight > maxPx) ? 'auto' : 'hidden'
             } else {
                 textarea.style.removeProperty('height')
                 textarea.style.removeProperty('overflow')
             }
+        }
+        onComposerInput(event) {
+            this.resizeTextarea(event.target, 132)
+            this.scheduleDraftSave()
+        }
+        onInput(event) {
+            this.resizeTextarea(event.target, 72)
         }
         async onPaste(event) {
             let clipboardData = event.clipboardData || window.clipboardData
@@ -238,11 +394,12 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
             const [text, traduction] = Array.isArray(detail) ? detail : [detail]
             if (!(this.inputRef.el.disabled || this.inputRef.el.readonly)) {
                 this.inputRef.el.value = text
-                this.onInput({ target: this.inputRef.el })
+                this.onComposerInput({ target: this.inputRef.el })
                 if (this.inputLangRef.el) {
                     this.inputLangRef.el.value = traduction || ''
                     this.onInput({ target: this.inputLangRef.el })
                 }
+                this.scheduleDraftSave()
             }
         }
         async setQuoteMessage({ detail: message }) {
@@ -291,6 +448,6 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
             browser.localStorage.setItem('chatroomShowTraductor', `${this.state.showTraductor}`)
         }
     }
-    Object.assign(Toolbox, { template: 'chatroom.Toolbox', props: { user: UserModel.prototype, selectedConversation: ConversationModel.prototype, }, components: { CheckBox, Emojis, AttachmentList, FileUploader, ActivityButton, Transition, SelectMenu, Message, } })
+    Object.assign(Toolbox, { template: 'chatroom.Toolbox', props: { user: UserModel.prototype, selectedConversation: ConversationModel.prototype, defaultAnswers: { optional: true }, }, components: { CheckBox, Emojis, AttachmentList, FileUploader, ActivityButton, Transition, SelectMenu, Message, } })
     return __exports;
 });;

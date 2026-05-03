@@ -2,10 +2,10 @@
     min-height: 42px;
     display: flex;
     justify-content: space-between;
-    padding: 0 6px 0 6px;
-    align-items: center;
+    padding: 4px 6px;
+    align-items: flex-start;
     color: var(--body-color);
-    overflow: hidden;
+    overflow: visible;
     flex-wrap: nowrap;
-    flex: 0 1 42px;
+    flex: 0 1 auto;
 }

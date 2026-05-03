@@ -20,6 +20,18 @@
 
     .o_sidebar_content {
         background-color: $acrux_content_background_color;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+
+        .o_Chatroom_thread_wrap {
+            flex: 1 1 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
         .o_ChatroomHeader {
             background-color: $acrux_header_background_color;
@@ -60,10 +72,10 @@
 
     .o_chatroom_header_alt {
         display: contents;
-        color: cornflowerblue;
+        color: var(--primary, #{$o-brand-primary});
 
         div {
-            border-top: 4px solid cornflowerblue;
+            border-top: 4px solid var(--primary, #{$o-brand-primary});
         }
 
         div:has(>span) {

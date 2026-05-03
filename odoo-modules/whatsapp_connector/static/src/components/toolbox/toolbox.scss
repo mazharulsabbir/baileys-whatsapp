@@ -1,7 +1,18 @@
 .acrux_Toolbox {
-    order: 3;
+    flex-shrink: 0;
+    border-top: 1px solid $acrux_header_border_color;
     border-left: 1px solid $acrux_header_border_color;
     border-right: 1px solid $acrux_header_border_color;
+    background-color: $o-view-background-color;
+
+    &.o_chat_toolbox_sending {
+        opacity: 0.92;
+        pointer-events: none;
+
+        .o_chat_toolbox_overflow .dropdown-toggle {
+            pointer-events: none;
+        }
+    }
 
     ::placeholder {
         color: $o-gray-400;
@@ -11,9 +22,41 @@
         padding: 0;
     }
 
+    .o_chat_snippet_chips {
+        max-height: 5.5rem;
+        overflow-y: auto;
+
+        .o_chat_snippet_chip {
+            max-width: 12rem;
+            font-size: 0.8125rem;
+            line-height: 1.2;
+        }
+    }
+
+    .o_chat_toolbox_overflow {
+        flex-shrink: 0;
+
+        .dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2rem;
+            padding-inline: 0.25rem;
+        }
+    }
+
+    .o_chat_toolbox_overflow .dropdown-toggle::after {
+        display: none;
+    }
+
+    .o_chat_toolbox_button_box {
+        row-gap: 0.25rem;
+    }
+
     .o_chat_toolbox_write {
-        width: 100%;
+        width: auto;
         border-radius: 18px;
+        white-space: nowrap;
     }
 
     .o_chat_toolbox_message_signing {
@@ -63,6 +106,43 @@
             min-height: 22px;
             height: 22px;
             margin-top: 2px;
+        }
+    }
+
+    .o_chat_toolbox_composer_row.o_chat_toolbox_input {
+        border-radius: 12px;
+        padding: 6px 8px 6px 12px;
+        align-items: flex-end;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+
+        .o_chat_toolbox_text_field {
+            min-height: 36px;
+            max-height: 132px;
+            line-height: 1.35;
+        }
+
+        .o_chat_toolbox_send {
+            flex-shrink: 0;
+            width: 2.5rem;
+            height: 2.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 0;
+            font-size: 16px;
+            line-height: 1;
+            opacity: 1;
+            color: $o-white;
+
+            i {
+                margin-left: 2px;
+            }
+
+            &:hover {
+                color: $o-white;
+                filter: brightness(0.96);
+            }
         }
     }
 

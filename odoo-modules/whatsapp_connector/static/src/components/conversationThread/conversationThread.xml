@@ -4,6 +4,11 @@
     <t t-name="chatroom.ConversationThread" owl="1">
         <div class="o_ConversationThread" t-ref="threadRef" t-on-scroll="syncMoreMessage">
             <t t-if="props.selectedConversation">
+                <div class="o_ConversationThread_empty text-muted text-center py-5 px-3 small"
+                    t-if="!props.selectedConversation.messages.length">
+                    <i class="fa fa-comments-o fa-2x mb-2 d-block opacity-50"/>
+                    <span t-out="emptyThreadHint"/>
+                </div>
                 <t t-set="lastDate" t-value="null" />
                 <t t-foreach="props.selectedConversation.messages" t-as="msg" t-key="msg.id">
                     <t t-set="currentDate" t-value="msg.dateFull" />

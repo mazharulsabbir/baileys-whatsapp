@@ -294,16 +294,17 @@ export class WhatsAppService {
   /**
    * Send an image message
    */
-  async sendImage(jid: string, image: Buffer | string, caption?: string): Promise<void> {
+  async sendImage(jid: string, image: Buffer | string, caption?: string): Promise<string | undefined> {
     if (!this.socket) {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
     try {
-      await this.socket.sendMessage(jid, {
+      const result = await this.socket.sendMessage(jid, {
         image: typeof image === 'string' ? { url: image } : image,
         caption
       });
+      return result?.key?.id ?? undefined;
     } catch (error) {
       const msgid = buildCompositeMsgId({
         id: Date.now().toString(),
@@ -324,16 +325,17 @@ export class WhatsAppService {
   /**
    * Send a video message
    */
-  async sendVideo(jid: string, video: Buffer | string, caption?: string): Promise<void> {
+  async sendVideo(jid: string, video: Buffer | string, caption?: string): Promise<string | undefined> {
     if (!this.socket) {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
     try {
-      await this.socket.sendMessage(jid, {
+      const result = await this.socket.sendMessage(jid, {
         video: typeof video === 'string' ? { url: video } : video,
         caption
       });
+      return result?.key?.id ?? undefined;
     } catch (error) {
       const msgid = buildCompositeMsgId({
         id: Date.now().toString(),
@@ -354,17 +356,18 @@ export class WhatsAppService {
   /**
    * Send an audio message
    */
-  async sendAudio(jid: string, audio: Buffer | string, ptt: boolean = false): Promise<void> {
+  async sendAudio(jid: string, audio: Buffer | string, ptt: boolean = false): Promise<string | undefined> {
     if (!this.socket) {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
     try {
-      await this.socket.sendMessage(jid, {
+      const result = await this.socket.sendMessage(jid, {
         audio: typeof audio === 'string' ? { url: audio } : audio,
         ptt,
         mimetype: 'audio/ogg; codecs=opus'
       });
+      return result?.key?.id ?? undefined;
     } catch (error) {
       const msgid = buildCompositeMsgId({
         id: Date.now().toString(),
@@ -385,18 +388,19 @@ export class WhatsAppService {
   /**
    * Send a document message
    */
-  async sendDocument(jid: string, document: Buffer | string, fileName?: string, caption?: string): Promise<void> {
+  async sendDocument(jid: string, document: Buffer | string, fileName?: string, caption?: string): Promise<string | undefined> {
     if (!this.socket) {
       throw new Error('Socket not initialized. Call connect() first.');
     }
 
     try {
-      await this.socket.sendMessage(jid, {
+      const result = await this.socket.sendMessage(jid, {
         document: typeof document === 'string' ? { url: document } : document,
         fileName,
         caption,
         mimetype: fileName ? getMimeType(fileName) : 'application/octet-stream'
       });
+      return result?.key?.id ?? undefined;
     } catch (error) {
       const msgid = buildCompositeMsgId({
         id: Date.now().toString(),

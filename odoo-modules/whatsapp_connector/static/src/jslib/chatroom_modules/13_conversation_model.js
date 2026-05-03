@@ -77,6 +77,30 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-model', ['@whatsapp_c
             const result = await this.env.services.orm.call(this.env.chatModel, 'build_dict', [[this.id]], { context: this.env.context, limit: 22 })
             this.env.services.bus_service.trigger('notification', [{ type: 'update_conversation', payload: result, }])
         }
+        messageSortKey(m) {
+            if (m.pendingOutgoing) {
+                return Number.MAX_SAFE_INTEGER / 2 + (m.localSeq || 0)
+            }
+            const id = typeof m.id === 'number' ? m.id : 0
+            return id
+        }
+        sortMessages() {
+            this.messages.sort((a, b) => this.messageSortKey(a) - this.messageSortKey(b))
+        }
+        realMessageCount() {
+            return this.messages.filter(m => !m.pendingOutgoing).length
+        }
+        removePendingMessage(tempId) {
+            if (tempId == null) {
+                return
+            }
+            this.messagesIds.delete(tempId)
+            const idx = this.messages.findIndex(m => m.id === tempId)
+            if (idx !== -1) {
+                this.messages.splice(idx, 1)
+            }
+            this.calculateMessageCount()
+        }
         appendMessages(messages) {
             if (messages?.length > 0) {
                 const newMessages = []
@@ -88,21 +112,22 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-model', ['@whatsapp_c
                 }
                 for (const msg of newMessages) { this.messagesIds.add(msg.id) }
                 this.messages.push(...newMessages)
-                this.messages.sort((a, b) => a.id - b.id)
+                this.sortMessages()
             }
             this.calculateMessageCount()
         }
         calculateMessageCount() {
             if (['new', 'current'].includes(this.status)) {
-                const messages = this.messages.filter(msg => !msg.ttype.startsWith('info'))
+                const messages = this.messages.filter(msg => !msg.ttype.startsWith('info') && !msg.pendingOutgoing)
                 let lastIndexOf
                 if (Array.prototype.findLastIndex) { lastIndexOf = messages.findLastIndex(msg => msg.fromMe) } else { lastIndexOf = messages.map(msg => msg.fromMe).lastIndexOf(true) }
                 this.countNewMsg = messages.length - (lastIndexOf + 1)
             } else { this.countNewMsg = 0 }
         }
         async syncMoreMessage() {
-            if (this.messages.length >= 22) {
-                const result = await this.env.services.orm.call(this.env.chatModel, 'build_dict', [[this.id]], { context: this.env.context, limit: 22, offset: this.messages.length })
+            const persisted = this.realMessageCount()
+            if (persisted >= 22) {
+                const result = await this.env.services.orm.call(this.env.chatModel, 'build_dict', [[this.id]], { context: this.env.context, limit: 22, offset: persisted })
                 this.appendMessages(result[0].messages)
                 await this.buildExtraObj()
             }
@@ -111,17 +136,52 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-model', ['@whatsapp_c
             let msg = new MessageModel(this, options)
             const jsonData = msg.exportToVals()
             if (options.custom_field) { jsonData[options.custom_field] = true }
-            const result = await this.env.services.orm.call(this.env.chatModel, 'send_message', [[this.id], jsonData], { context: this.env.context })
-            msg.updateFromJson(result[0])
-            await msg.buildExtraObj()
-            if (this.messagesIds.has(msg.id)) { msg = this.messages.find(msg2 => msg2.id === msg.id) } else {
-                this.messagesIds.add(msg.id)
+            const optimistic = msg.ttype === 'text' && !options.res_model
+            let tempId = null
+            if (optimistic) {
+                this._pendingSeq = (this._pendingSeq || 0) + 1
+                msg.pendingOutgoing = true
+                msg.localSeq = this._pendingSeq
+                tempId = -this._pendingSeq
+                msg.id = tempId
+                this.messagesIds.add(tempId)
                 this.messages.push(msg)
+                this.sortMessages()
+                this.lastActivity = luxon.DateTime.now()
+                this.env.chatBus.trigger('mobileNavigate', 'middleSide')
+                this.calculateMessageCount()
+                this.env.chatBus.trigger('inmediateScrollToMessage', { message: msg })
             }
-            this.lastActivity = luxon.DateTime.now()
-            this.env.chatBus.trigger('mobileNavigate', 'middleSide')
-            this.calculateMessageCount()
-            return msg
+            try {
+                const result = await this.env.services.orm.call(this.env.chatModel, 'send_message', [[this.id], jsonData], { context: this.env.context })
+                const serverData = result[0]
+                if (optimistic) {
+                    this.messagesIds.delete(tempId)
+                    msg.updateFromJson(serverData)
+                    msg.pendingOutgoing = false
+                    msg.localSeq = 0
+                    if (!this.messagesIds.has(msg.id)) {
+                        this.messagesIds.add(msg.id)
+                    }
+                } else {
+                    msg.updateFromJson(serverData)
+                    if (this.messagesIds.has(msg.id)) { msg = this.messages.find(msg2 => msg2.id === msg.id) } else {
+                        this.messagesIds.add(msg.id)
+                        this.messages.push(msg)
+                    }
+                }
+                await msg.buildExtraObj()
+                this.sortMessages()
+                this.lastActivity = luxon.DateTime.now()
+                this.env.chatBus.trigger('mobileNavigate', 'middleSide')
+                this.calculateMessageCount()
+                return msg
+            } catch (e) {
+                if (optimistic) {
+                    this.removePendingMessage(tempId)
+                }
+                throw e
+            }
         }
         async sendProduct(productId) { await this.env.services.orm.call(this.env.chatModel, 'send_message_product', [[this.id], parseInt(productId)], { context: this.env.context }) }
         async messageSeen() { try { await this.env.services.orm.silent.call(this.env.chatModel, 'conversation_send_read', [[this.id]], { context: this.env.context }) } catch (e) { console.error(e) } }

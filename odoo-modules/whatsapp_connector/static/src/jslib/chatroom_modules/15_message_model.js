@@ -29,6 +29,8 @@ odoo.define('@whatsapp_connector/chatroom_mod/message-model', ['@web/core/l10n/t
             this.contactNumber = ''
             this.quote = null
             this.dateDelete = null
+            this.pendingOutgoing = false
+            this.localSeq = 0
             if (base) { this.updateFromJson(base) }
         }
         updateFromJson(base) {

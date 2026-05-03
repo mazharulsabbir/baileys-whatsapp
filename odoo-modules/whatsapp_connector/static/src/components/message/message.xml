@@ -5,6 +5,7 @@
         <t t-set="message" t-value="props.message" />
         <div class="acrux_Message" t-attf-class="o_chat_message_{{message.ttype}}
             {{message.errorMsg ? 'o_message_error' : ''}}
+            {{message.pendingOutgoing ? 'o_chat_message_pending' : ''}}
             {{message.ttype.startsWith('info') ? 'o_chat_message_info' : message.fromMe ? 'o_chat_message_out' : 'o_chat_message_in'}}"
             t-att-data-id="message.id">
             <t t-if="message.ttype.startsWith('info')">
@@ -62,7 +63,8 @@
                             <i class="fa fa-language" />
                         </a>
                     </t>
-                    <div class="o_chat_msg_hour">
+                    <div class="o_chat_msg_hour d-flex align-items-center gap-1">
+                        <span t-if="message.pendingOutgoing" class="o_chat_msg_pending" title="Sending">…</span>
                         <t t-out="message.hour" />
                     </div>
                     <span t-if="message.errorMsg" class="o_message_error_text" t-att-title="message.errorMsg">
