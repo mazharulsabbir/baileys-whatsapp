@@ -1,6 +1,8 @@
 import type { WAMessage, WASocket } from '@whiskeysockets/baileys';
 import { downloadMediaMessage, isJidGroup } from '@whiskeysockets/baileys';
 import type { Logger } from 'pino';
+import { canonicalChatJidFromKey, type ChatKeyLike } from '@/lib/canonical-chat-jid';
+import { normalizePhoneJidDomain } from '@/lib/jid';
 import { saveInboundMedia } from '@/lib/wa-media-store';
 
 function tsToNumber(ts: unknown): number | undefined {
@@ -200,14 +202,16 @@ export function validateInstagramMedia(
 }
 
 /** Matches Odoo `msgid` / inbound `id` (prefix encodes from_me for apichat.io). */
-export function buildCompositeMsgId(key: {
+export function buildCompositeMsgId(key: ChatKeyLike & {
   id?: string | null;
-  remoteJid?: string | null;
   fromMe?: boolean | null;
 }): string {
   const fm = key.fromMe ? 'true' : 'false';
   const waId = key.id ?? '';
-  const jid = key.remoteJid ?? '';
+  const jidResolved =
+    canonicalChatJidFromKey(key) ??
+    (key.remoteJid ? normalizePhoneJidDomain(key.remoteJid) : '');
+  const jid = jidResolved || key.remoteJid || '';
   return `${fm}_${waId}_${jid}`;
 }
 
@@ -216,10 +220,11 @@ export function buildCompositeMsgId(key: {
  * Default `type: text`; see `prepareAcuxInboundRow` for hosted media URLs.
  */
 export function waMessageToAcuxInbound(message: WAMessage): Record<string, unknown> {
-  const chatId = message.key.remoteJid ?? '';
+  const chatId = canonicalChatJidFromKey(message.key) ?? message.key.remoteJid ?? '';
   const id = buildCompositeMsgId({
     id: message.key.id,
     remoteJid: message.key.remoteJid,
+    remoteJidAlt: message.key.remoteJidAlt,
     fromMe: message.key.fromMe ?? false,
   });
 

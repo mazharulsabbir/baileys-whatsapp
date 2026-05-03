@@ -2,11 +2,13 @@ import {
   WASocket,
   proto,
   WAMessage,
+  getKeyAuthor,
   isJidGroup
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import config from '../config';
 import type { InboundWebhookPayload } from '../webhook-types';
+import { canonicalChatJidFromKey } from '@/lib/canonical-chat-jid';
 import { prepareAcuxInboundRow } from '@/lib/odoo-acrux-mapper';
 import { deliverAcuxInboundRow, deliverAcuxMessageDeletes } from '@/lib/odoo-webhook-delivery';
 
@@ -124,10 +126,10 @@ async function handleMessage(
   tenantId?: string,
   onInboundWebhook?: (payload: InboundWebhookPayload) => void
 ): Promise<void> {
-  const chatId = message.key.remoteJid;
+  const chatId = canonicalChatJidFromKey(message.key) ?? message.key.remoteJid;
   const isGroup = Boolean(chatId && isJidGroup(chatId));
   const fromMe = message.key.fromMe;
-  const senderId = fromMe ? 'me' : (message.key.participant || message.key.remoteJid);
+  const senderId = getKeyAuthor(message.key) || (message.key.remoteJid ?? '');
   const senderName = message.pushName || 'Unknown';
 
   let groupName: string | undefined;
@@ -284,7 +286,7 @@ async function handleCommand(
   content: string,
   logger: pino.Logger
 ): Promise<void> {
-  const chatId = message.key.remoteJid;
+  const chatId = canonicalChatJidFromKey(message.key) ?? message.key.remoteJid;
   if (!chatId) return;
 
   const trimmedContent = content.trim();

@@ -310,7 +310,10 @@ class ChatMessageWizard(models.TransientModel):
     def create_or_find_conversation(self):
         Conv = self.env['acrux.chat.conversation']
         if not self.connector_id or not self.number \
-                or self.connector_id.connector_type not in ['apichat.io', 'gupshup', 'waba_extern']:
+                or not (
+                    self.connector_id.connector_type in ['gupshup', 'waba_extern']
+                    or self.connector_id.uses_whatsapp_web_api()
+                ):
             raise ValidationError(_('Enter required values'))
         number = self.connector_id.clean_id(self.number)
         exist = Conv.search([('connector_id', '=', self.connector_id.id), ('number', '=', number)], limit=1)

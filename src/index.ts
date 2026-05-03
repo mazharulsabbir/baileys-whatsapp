@@ -1,18 +1,10 @@
 import whatsappService from './services/whatsapp';
 import config from './config';
-import pino from 'pino';
+import { createDefaultPinoLogger } from './lib/pino-logger';
 import fs from 'fs';
 import path from 'path';
 
-const logger = pino({
-  level: config.logLevel,
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true
-    }
-  }
-});
+const logger = createDefaultPinoLogger(config.logLevel);
 
 /**
  * Clear session data

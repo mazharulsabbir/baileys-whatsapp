@@ -28,7 +28,7 @@
                             required="new_number == False" />
                         <field name="connector_id"
                             options="{'no_create': True, 'no_open': True}"
-                            domain="[('connector_type', 'in', ['apichat.io', 'gupshup', 'waba_extern'])]"
+                            domain="[('connector_type', 'in', ['apichat.io', 'baileys', 'gupshup', 'waba_extern'])]"
                             invisible="new_number == False"
                             required="new_number == True" />
                         <field name="number"

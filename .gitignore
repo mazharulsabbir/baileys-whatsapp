@@ -1,29 +1,44 @@
 # Dependencies
 node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
 
-# Build output
-dist/
-build/
-*.tsbuildinfo
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# Session data (WhatsApp authentication)
-whatsapp_session/
-*.session/
-auth_info/
-creds.json
-sessions/
-wa-media-cache/
+# Lockfiles: commit the one your team uses (npm / yarn / pnpm). Do not ignore it.
 
 # Next.js
 .next/
+out/
+
+# TypeScript / Node build
+dist/
+dist-bot/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Vercel / tooling caches
+.vercel
+.turbo
+.eslintcache
+
+# Prisma (local SQLite experiments; this project uses Postgres in production)
+*.db
+*.db-journal
+
+# WhatsApp auth & session (never commit)
+whatsapp_session/
+*.session/
+auth_info/
+sessions/
+creds.json
+
+# Cached / hosted media on disk (see lib/wa-media-store.ts)
+wa-media-cache/
 
 # Logs
 logs/
@@ -33,16 +48,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 *~
 
-# IDE
-.vscode/
+# IDE (uncomment .vscode lines if you commit shared editor settings)
 .idea/
+.vscode/
 *.sublime-project
 *.sublime-workspace
 
@@ -50,11 +65,35 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Temporary files
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.ipynb_checkpoints/
+*.cover
+.hypothesis/
+cython_debug/
+
+# Temp
 tmp/
 temp/
 *.tmp
 
-# Media downloads (if you add download functionality)
+# Misc local folders (legacy / optional)
 downloads/
 media/

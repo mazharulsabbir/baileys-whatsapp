@@ -152,6 +152,7 @@ export function deliverAcuxMessageDeletes(
       msgid: buildCompositeMsgId({
         id: k.id,
         remoteJid: k.remoteJid,
+        remoteJidAlt: k.remoteJidAlt,
         fromMe: k.fromMe ?? false,
       }),
     }));

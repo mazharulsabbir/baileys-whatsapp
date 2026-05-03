@@ -174,7 +174,7 @@ class AcruxChatConversation(models.Model):
         self.ensure_one()
         if self.env.context.get('not_download_profile_picture'):
             return
-        if self.connector_id.connector_type == 'apichat.io':
+        if self.connector_id.uses_whatsapp_web_api():
             params = {'chatId': self.get_chat_id()}
             self._update_conversation(params, timeout=5)
         elif self.connector_id.is_facebook_or_instagram():
@@ -184,7 +184,7 @@ class AcruxChatConversation(models.Model):
     def get_chat_id(self):
         self.ensure_one()
         out = self.number
-        if self.connector_id.connector_type == 'apichat.io':
+        if self.connector_id.uses_whatsapp_web_api():
             if self.conv_type == 'normal':
                 out = f'{self.number}@c.us'
             elif self.conv_type == 'private':
@@ -665,7 +665,7 @@ class AcruxChatConversation(models.Model):
         Message = self.env['acrux.chat.message']
         for conv_id in self:
             conn_id = conv_id.connector_id
-            if conn_id.ca_status and conn_id.connector_type == 'apichat.io':
+            if conn_id.ca_status and conn_id.uses_whatsapp_web_api():
                 conv_id.mark_conversation_read({'phone': conv_id.number, 'chat_type': conv_id.conv_type})
             elif conn_id.is_owner_facebook():
                 if conn_id.ca_status and conn_id.is_facebook():
@@ -854,7 +854,7 @@ class AcruxChatConversation(models.Model):
         }
         if message.get('metadata'):
             out['metadata'] = message['metadata']
-        if connector_id.connector_type == 'apichat.io' and message.get('id'):
+        if connector_id.uses_whatsapp_web_api() and message.get('id'):
             out['from_me'] = message['id'].split('_')[0] == 'true'
             if message.get('id'):
                 if '@l.us' in message['id']:

@@ -29,7 +29,7 @@
                     <div class="oe_button_box" name="button_box">
                         <button name="ca_get_chat_list" type="object" string="Update Chat List"
                             class="oe_stat_button" icon="fa-cog"
-                            invisible="connector_type not in ['apichat.io'] or ca_status == False" />
+                            invisible="connector_type not in ['apichat.io', 'baileys'] or ca_status == False" />
                         <button name="update_template_waba" type="object" string="Get Templates WABA"
                             class="oe_stat_button" icon="fa-download"
                             invisible="connector_type not in ['gupshup', 'waba_extern'] or ca_status == False" />
@@ -281,7 +281,7 @@
                                         </div>
                                     </div>
 
-                                    <div invisible="connector_type == 'apichat.io'">
+                                    <div invisible="connector_type in ('apichat.io', 'baileys')">
                                         <div class="o_setting_right_pane pt16" style="margin-left: 90px;">
                                             <div class="list-group" style="width: fit-content;">
                                                 <button name="ca_get_status" type="object"
@@ -293,7 +293,7 @@
                                     </div>
 
                                     <!-- ADD: apichat.io -->
-                                    <div invisible="connector_type != 'apichat.io'">
+                                    <div invisible="connector_type not in ('apichat.io', 'baileys')">
                                         <div class="o_setting_right_pane pt16" style="margin-left: 90px;">
                                             <div invisible="ca_status == False">
                                                 <div class="list-group">

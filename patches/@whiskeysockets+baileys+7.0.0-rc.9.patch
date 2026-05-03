@@ -1,0 +1,21 @@
+diff --git a/node_modules/@whiskeysockets/baileys/lib/Socket/chats.js b/node_modules/@whiskeysockets/baileys/lib/Socket/chats.js
+index 8202174..69fc30e 100644
+--- a/node_modules/@whiskeysockets/baileys/lib/Socket/chats.js
++++ b/node_modules/@whiskeysockets/baileys/lib/Socket/chats.js
+@@ -36,7 +36,7 @@ export const makeChatsSocket = (config) => {
+     };
+     const fetchPrivacySettings = async (force = false) => {
+         if (!privacySettings || force) {
+-            const { content } = await query({
++            const privacyIqResult = await query({
+                 tag: 'iq',
+                 attrs: {
+                     xmlns: 'privacy',
+@@ -45,6 +45,7 @@ export const makeChatsSocket = (config) => {
+                 },
+                 content: [{ tag: 'privacy', attrs: {} }]
+             });
++            const content = privacyIqResult?.content;
+             privacySettings = reduceBinaryNodeToDictionary(content?.[0], 'category');
+         }
+         return privacySettings;

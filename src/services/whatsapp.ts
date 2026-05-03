@@ -9,6 +9,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import { createDefaultPinoLogger } from '../lib/pino-logger';
 import path from 'path';
 import fs from 'fs';
 import config from '../config';
@@ -92,16 +93,7 @@ export class WhatsAppService {
     this.authPath = path.join(options.authBaseDir, safeId);
 
     this.logger =
-      options.logger ??
-      pino({
-        level: config.logLevel,
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true
-          }
-        }
-      });
+      options.logger ?? createDefaultPinoLogger(config.logLevel);
   }
 
   /** Latest QR payload from Baileys (until paired or cleared) */

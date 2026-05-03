@@ -271,7 +271,7 @@ class AcruxChatMessages(models.Model):
             return out
 
         self.ensure_one()
-        if self.connector_id.connector_type in ['gupshup', 'apichat.io']:
+        if self.connector_id.connector_type == 'gupshup' or self.connector_id.uses_whatsapp_web_api():
             message['buttons'] = self.button_ids.mapped(map_button)
 
     def set_list(self, message):
@@ -505,7 +505,7 @@ class AcruxChatMessages(models.Model):
             self.add_attachment(data)
         if data.get('metadata'):
             self.metadata_json = json.dumps(data['metadata'], indent=2)
-            if self.contact_id.connector_type == 'apichat.io':
+            if self.contact_id.connector_id.uses_whatsapp_web_api():
                 self.process_metadata_apichat(data)
             elif self.contact_id.connector_type == 'gupshup':
                 self.process_metadata_gupshup(data)
@@ -544,7 +544,7 @@ class AcruxChatMessages(models.Model):
     def _constrains_button_ids(self):
         for message in self:
             if message.button_ids and message.connector_id and message.ttype:
-                if message.connector_id.connector_type == 'apichat.io':
+                if message.connector_id.uses_whatsapp_web_api():
                     if message.ttype not in ['text', 'image', 'video', 'file', 'location']:
                         raise ValidationError(_('Button message not supported for type %s') % message.ttype)
                 elif message.connector_id.connector_type == 'gupshup':

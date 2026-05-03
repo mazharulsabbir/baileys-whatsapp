@@ -20,6 +20,9 @@ class AcruxChatConnector(models.Model):
     _description = 'Connector Definition'
     _order = 'sequence, id'
 
+    # Baileys / Next.js gateway: same HTTP contract as ApiChat.io (`action` header); set host to your app.
+    DEFAULT_BAILEYS_GATEWAY_URL = 'http://localhost:3000/api/gateway/v1'
+
     def _get_default_color(self):
         return randint(1, 11)
 
@@ -31,6 +34,7 @@ class AcruxChatConnector(models.Model):
                                                             'button.</i>')
     connector_type = fields.Selection([('not_set', 'Not set'),
                                        ('apichat.io', 'ApiChat.io'),
+                                       ('baileys', 'Baileys (self-hosted WhatsApp)'),
                                        ('gupshup', 'GupShup'),
                                        ('facebook', 'Facebook'),
                                        ('instagram', 'Instagram'),
@@ -149,6 +153,8 @@ class AcruxChatConnector(models.Model):
             self.endpoint = 'https://social.acruxlab.net/prod/v1/in'
         elif self.is_waba_extern():
             self.endpoint = 'https://social.acruxlab.net/prod/v1/wa_ext'
+        elif self.is_baileys():
+            self.endpoint = self.DEFAULT_BAILEYS_GATEWAY_URL
         else:
             self.endpoint = 'https://api.acruxlab.net/prod/v2/odoo'
 
@@ -741,3 +747,11 @@ class AcruxChatConnector(models.Model):
 
     def is_waba_extern(self):
         return self.connector_type == 'waba_extern'
+
+    def is_baileys(self):
+        return self.connector_type == 'baileys'
+
+    def uses_whatsapp_web_api(self):
+        """Same outbound API as ApiChat.io (single base URL, ``action`` in headers)."""
+        self.ensure_one()
+        return self.connector_type in ('apichat.io', 'baileys')
