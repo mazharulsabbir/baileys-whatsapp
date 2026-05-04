@@ -2,7 +2,6 @@
 import re
 from odoo import models, fields, api
 from .. import tools
-from datetime import datetime
 
 
 class Template(models.Model):
@@ -83,9 +82,11 @@ class Template(models.Model):
         for record in data:
             vals = {self.to_snake_case(key): record[key] for key in record if self.to_snake_case(key) in field_names}
             if vals.get('created_on'):
-                vals['created_on'] = tools.date2sure_write(datetime.fromtimestamp(vals['created_on']))
+                dt = tools.unix_ts_to_naive_utc(vals['created_on'])
+                vals['created_on'] = tools.date2sure_write(dt if dt else vals['created_on'])
             if vals.get('modified_on'):
-                vals['modified_on'] = tools.date2sure_write(datetime.fromtimestamp(vals['modified_on']))
+                dt = tools.unix_ts_to_naive_utc(vals['modified_on'])
+                vals['modified_on'] = tools.date2sure_write(dt if dt else vals['modified_on'])
             template_ids = self.search([('connector_id', '=', connector_id.id),
                                         ('template_id', '=', vals['template_id'])])
             if template_ids:

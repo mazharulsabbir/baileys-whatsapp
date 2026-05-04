@@ -1,9 +1,10 @@
-odoo.define('@whatsapp_connector/chatroom_mod/default-answer', ['@web/core/l10n/translation', '@web/core/errors/error_dialogs', '@odoo/owl', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/default-answer-model'], function (require) {
+odoo.define('@whatsapp_connector/chatroom_mod/default-answer', ['@web/core/l10n/translation', '@web/core/errors/error_dialogs', '@odoo/owl', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/default-answer-model', '@whatsapp_connector/chatroom_mod/default-answer-send'], function (require) {
     'use strict'; let __exports = {}; const { _t } = require('@web/core/l10n/translation')
     const { WarningDialog } = require('@web/core/errors/error_dialogs')
     const { Component } = require('@odoo/owl')
     const { ConversationModel } = require('@whatsapp_connector/chatroom_mod/conversation-model')
     const { DefaultAnswerModel } = require('@whatsapp_connector/chatroom_mod/default-answer-model')
+    const { buildSendOptions, snippetNeedsAttachment } = require('@whatsapp_connector/chatroom_mod/default-answer-send')
     const DefaultAnswer = __exports.DefaultAnswer = class DefaultAnswer extends Component {
         setup() {
             super.setup()
@@ -14,19 +15,36 @@ odoo.define('@whatsapp_connector/chatroom_mod/default-answer', ['@web/core/l10n/
             let out = Promise.resolve()
             if (event) { event.target.disabled = true }
             if (this.props.selectedConversation && this.props.selectedConversation.isCurrent()) {
-                let text, ttype = this.props.defaultAnswer.ttype
-                if (ttype === 'code') {
-                    ttype = 'text'
-                    text = await this.env.services.orm.call('acrux.chat.default.answer', 'eval_answer', [[this.props.defaultAnswer.id], this.props.selectedConversation.id], { context: this.env.context })
-                } else { if (this.props.defaultAnswer.text && '' !== this.props.defaultAnswer.text) { text = this.props.defaultAnswer.text } else { text = this.props.defaultAnswer.name } }
-                const options = {
-                    from_me: true, text: text, ttype: ttype, res_model: this.props.defaultAnswer.resModel, res_id: this.props.defaultAnswer.resId, button_ids: this.props.defaultAnswer.buttons.map(btn => {
-                        const btn2 = { ...btn }
-                        delete btn2.id
-                        return btn2
-                    }), chat_list_id: this.props.defaultAnswer.chatListRecord
+                const da = this.props.defaultAnswer
+                let codeResult = undefined
+                if (da.ttype === 'code') {
+                    try {
+                        codeResult = await this.env.services.orm.call('acrux.chat.default.answer', 'eval_answer', [[da.id], this.props.selectedConversation.id], { context: this.env.context })
+                    } catch (e) {
+                        this.env.services.dialog.add(WarningDialog, { message: String(e.message || e) })
+                        return out.finally(() => { if (event) { event.target.disabled = false } })
+                    }
+                    if (codeResult === null || codeResult === undefined) {
+                        this.env.services.dialog.add(WarningDialog, { message: _t('This snippet did not return any text (set `result` in the Python code).') })
+                        return out.finally(() => { if (event) { event.target.disabled = false } })
+                    }
+                    if (String(codeResult).trim() === '') {
+                        this.env.services.dialog.add(WarningDialog, { message: _t('The Python snippet returned an empty message.') })
+                        return out.finally(() => { if (event) { event.target.disabled = false } })
+                    }
                 }
-                if (ttype === 'text' && text) { this.env.chatBus.trigger('setInputText', text) } else { out = this.props.selectedConversation.createMessage(options) }
+                const options = buildSendOptions(da, da.ttype === 'code' ? { codeResult } : {})
+                let text = options.text
+                if ((da.ttype === 'text' || da.ttype === 'code') && (text !== null && text !== undefined && String(text).trim() !== '')) {
+                    text = typeof text !== 'string' ? String(text) : text
+                    this.env.chatBus.trigger('setInputText', text)
+                } else {
+                    if (snippetNeedsAttachment(da) && (!da.resModel || !da.resId)) {
+                        this.env.services.dialog.add(WarningDialog, { message: _t('This default reply has no file attached. Configure it under Default Answers.') })
+                        return out.finally(() => { if (event) { event.target.disabled = false } })
+                    }
+                    out = this.props.selectedConversation.createMessage(options)
+                }
             } else { this.env.services.dialog.add(WarningDialog, { message: _t('You must select a conversation.') }) }
             return out.finally(() => { if (event) { event.target.disabled = false } })
         }

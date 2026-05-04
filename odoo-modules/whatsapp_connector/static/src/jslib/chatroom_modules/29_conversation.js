@@ -20,6 +20,6 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation', ['@web/session', '@
             return (conversation.id === selectedConversation?.id)
         }
     }
-    Object.assign(Conversation, { template: 'chatroom.Conversation', props: { conversation: ConversationModel.prototype, selectedConversation: { type: ConversationModel.prototype, optional: true }, hideClose: { type: Boolean, optional: true }, selectTrigger: { type: String, optional: true }, deleteTrigger: { type: String, optional: true }, }, defaultProps: { hideClose: false, selectTrigger: 'selectConversation', deleteTrigger: 'deleteConversation', }, components: { RelativeTime, } })
+    Object.assign(Conversation, { template: 'chatroom.Conversation', props: { conversation: ConversationModel.prototype, selectedConversation: { type: ConversationModel.prototype, optional: true }, hideClose: { type: Boolean, optional: true }, selectTrigger: { type: String, optional: true }, deleteTrigger: { type: String, optional: true }, listTick: { type: Number, optional: true }, }, defaultProps: { hideClose: false, selectTrigger: 'selectConversation', deleteTrigger: 'deleteConversation', listTick: 0, }, components: { RelativeTime, } })
     return __exports;
 });;

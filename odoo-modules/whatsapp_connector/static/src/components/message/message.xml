@@ -20,7 +20,7 @@
                     <t t-call="chatroom.MessageTitle" />
                 </div>
                 <div class="acrux_chat_message_quote" t-if="props.message.quote" t-on-click.capture="clickQuoteMessage">
-                    <Message message="props.message.quote" noAction="true" />
+                    <Message message="props.message.quote" noAction="true" timeTick="props.timeTick" />
                 </div>
                 <div class="o_chat_msg_content" t-attf-class="{{messageCssClass()}}">
                     <MessageMetadata type="message.metadataType"
@@ -65,7 +65,7 @@
                     </t>
                     <div class="o_chat_msg_hour d-flex align-items-center gap-1">
                         <span t-if="message.pendingOutgoing" class="o_chat_msg_pending" title="Sending">…</span>
-                        <t t-out="message.hour" />
+                        <span t-out="message.hour" t-att-data-time-tick="props.timeTick"/>
                     </div>
                     <span t-if="message.errorMsg" class="o_message_error_text" t-att-title="message.errorMsg">
                         <svg height="10" width="10" viewBox="0 0 16 16">
@@ -145,17 +145,19 @@
                 <t t-set="mime" t-value="message.resModelObj.mime" />
                 <t t-set="data" t-value="message.resModelObj.data" />
                 <t t-if="message.resModelObj.mime.startsWith('image')">
-                    <div href=""
-                        t-attf-style="background-image: url('data:{{mime}};base64,{{data}}'); background-size: 200px; cursor: pointer; height: 100px;width: 100px;"
-                        t-attf-data-mimetype="{{mime}}"
-                        class="o_AttachmentImage o_image o-attachment-viewable o-details-overlay o-medium"
+                    <div class="acrux_story_preview" role="button" tabindex="0" title="Open"
                         t-on-click="openStoryImage">
+                        <img class="acrux_story_preview-img" loading="lazy" alt=""
+                            t-attf-src="data:{{mime}};base64,{{data}}" />
                     </div>
                 </t>
                 <t t-elif="message.resModelObj.mime.startsWith('video')">
-                    <video width="200" height="200" controls="true" controlsList="nodownload">
-                        <source t-attf-src="data:{{mime}};base64,{{data}}" t-attf-type="{{mime}}" />
-                    </video>
+                    <div class="acrux_video_preview">
+                        <video class="acrux_video_preview-el" controls="true" controlsList="nodownload"
+                            preload="metadata">
+                            <source t-attf-src="data:{{mime}};base64,{{data}}" t-attf-type="{{mime}}" />
+                        </video>
+                    </div>
                 </t>
                 <t t-else="">
                     <i>Story not found.</i>
@@ -177,10 +179,12 @@
 
         <t t-else="">
             <t t-if="message.resModelObj">
-                <AttachmentList
-                    unlinkAttachment="() => {}"
-                    attachments="[message.resModelObj]"
-                    imagesHeight="150"/>
+                <div class="acrux_mail_attachments_shell">
+                    <AttachmentList
+                        unlinkAttachment="() => {}"
+                        attachments="[message.resModelObj]"
+                        imagesHeight="180"/>
+                </div>
             </t>
             <t t-else="">
                 File not found
@@ -192,7 +196,7 @@
     </t>
 
     <t t-name="chatroom.MessageSummary" owl="1">
-        <div class="o_message_summary">
+        <div class="o_message_summary" t-att-data-list-tick="props.listTick ?? 0">
             <div class="o_msg_summary_content">
                 <t t-if="message.ttype == 'image'">
                     <i class="fa fa-camera" style="margin-right: 0.4rem;"/>

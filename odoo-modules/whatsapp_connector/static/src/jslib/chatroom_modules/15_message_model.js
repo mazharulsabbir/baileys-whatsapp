@@ -1,6 +1,6 @@
 odoo.define('@whatsapp_connector/chatroom_mod/message-model', ['@web/core/l10n/translation', '@web/core/l10n/dates', '@mail/utils/common/misc', '@whatsapp_connector/chatroom_mod/message-base-model', '@whatsapp_connector/chatroom_mod/attachment'], function (require) {
     'use strict'; let __exports = {}; const { _t } = require('@web/core/l10n/translation')
-    const { deserializeDateTime, formatDateTime, formatDate, serializeDateTime } = require('@web/core/l10n/dates')
+    const { deserializeDateTime, formatDateTime, formatDate, serializeDateTime, parseDateTime } = require('@web/core/l10n/dates')
     const { assignDefined } = require('@mail/utils/common/misc')
     const { MessageBaseModel } = require('@whatsapp_connector/chatroom_mod/message-base-model')
     const { Attachment } = require('@whatsapp_connector/chatroom_mod/attachment')
@@ -141,14 +141,19 @@ odoo.define('@whatsapp_connector/chatroom_mod/message-model', ['@web/core/l10n/t
                 } else { this.resModelObj = this.createAttachObject(attach) }
             }
         }
-        get date() { return formatDate(this.dateMessage) }
+        get date() { return this.dateMessage?.isValid ? formatDate(this.dateMessage) : '' }
         get dateFull() {
+            if (!this.dateMessage?.isValid) {
+                return ''
+            }
             let dateDay = this.dateMessage.toLocaleString(DateTime.DATE_FULL)
-            if (dateDay === DateTime.now().toLocaleString(DateTime.DATE_FULL)) { dateDay = _t('Today') }
+            if (dateDay === DateTime.now().toLocaleString(DateTime.DATE_FULL)) {
+                dateDay = _t('Today')
+            }
             return dateDay
         }
-        get dateFullTime() { return this.dateMessage.toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) }
-        get hour() { return formatDateTime(this.dateMessage, { format: 'HH:mm' }) }
+        get dateFullTime() { return this.dateMessage?.isValid ? this.dateMessage.toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : '' }
+        get hour() { return this.dateMessage?.isValid ? formatDateTime(this.dateMessage, { format: 'HH:mm' }) : '' }
         get isProductType() { return this.ttype === 'image' && this.isProduct }
         get authorName() {
             let name = false
@@ -176,7 +181,32 @@ odoo.define('@whatsapp_connector/chatroom_mod/message-model', ['@web/core/l10n/t
                 }
             }
         }
-        convertDate(field) { if (this[field] && (this[field] instanceof String || typeof this[field] === 'string')) { this[field] = deserializeDateTime(this[field]) } }
+        convertDate(field) {
+            let val = this[field]
+            const { DateTime } = luxon
+            if (val instanceof DateTime) {
+                this[field] = val.isValid ? val : DateTime.now()
+                return
+            }
+            if (typeof val !== 'string' || !val) {
+                return
+            }
+            val = val.trim()
+            let dt = deserializeDateTime(val)
+            if (dt.isValid) {
+                this[field] = dt
+                return
+            }
+            try {
+                dt = parseDateTime(val)
+                if (dt && dt.isValid) {
+                    this[field] = dt
+                    return
+                }
+            } catch (_) { /* malformed */ }
+            dt = DateTime.fromISO(val)
+            this[field] = dt.isValid ? dt.setZone('default') : DateTime.now()
+        }
         createAttachObject(attachmentData) {
             const attachment = new Attachment()
             attachmentData['message'] = this

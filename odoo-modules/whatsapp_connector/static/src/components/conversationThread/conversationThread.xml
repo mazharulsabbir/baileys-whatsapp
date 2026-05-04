@@ -2,7 +2,9 @@
 <templates xml:space="preserve">
 
     <t t-name="chatroom.ConversationThread" owl="1">
-        <div class="o_ConversationThread" t-ref="threadRef" t-on-scroll="syncMoreMessage">
+        <div class="o_ConversationThread" t-ref="threadRef"
+            t-on-scroll="syncMoreMessage"
+            t-att-data-chat-ui-tick="props.uiTick">
             <t t-if="props.selectedConversation">
                 <div class="o_ConversationThread_empty text-muted text-center py-5 px-3 small"
                     t-if="!props.selectedConversation.messages.length">
@@ -18,7 +20,7 @@
                         </div>
                     </t>
                     <t t-set="lastDate" t-value="currentDate" />
-                    <Message message="msg" />
+                    <Message message="msg" timeTick="props.uiTick" />
                 </t>
             </t>
         </div>

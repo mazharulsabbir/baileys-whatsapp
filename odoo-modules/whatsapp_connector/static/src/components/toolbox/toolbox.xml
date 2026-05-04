@@ -6,12 +6,12 @@
             t-attf-class="{{ props.selectedConversation ? '' : 'd-none' }} {{ state.isSending ? 'o_chat_toolbox_sending' : '' }}"
             t-att-aria-busy="state.isSending ? 'true' : 'false'"
             t-ref="toolboxRef">
-            <div class="o_chat_toolbox_attachements overflow-auto"
+            <div class="o_chat_toolbox_attachements acrux_mail_attachments_shell overflow-auto"
                 t-attf-class="{{ conversationMine }}">
                 <AttachmentList
                     attachments="state.attachments"
                     unlinkAttachment.bind="unlinkAttachment"
-                    imagesHeight="150"/>
+                    imagesHeight="180"/>
             </div>
             <div class="o_chat_toolbox_message_quote" t-if="state.message">
                 <div class="o_chat_toolbox_message_quote_content">
@@ -28,7 +28,7 @@
                 t-if="snippetChips.length">
                 <button type="button" class="btn btn-sm btn-light border text-truncate o_chat_snippet_chip"
                     t-foreach="snippetChips" t-as="answer" t-key="answer.id"
-                    t-att-title="answer.text"
+                    t-att-title="getSnippetChipTitle(answer)"
                     t-out="answer.name"
                     t-on-click="() => this.insertSnippet(answer)" />
             </div>

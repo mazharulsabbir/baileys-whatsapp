@@ -20,8 +20,14 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
             useBus(this.env.chatBus, 'cleanSearch', this.closeFilter.bind(this))
             useBus(this.env.chatBus, 'closeChatFilter', this.closeChatFilter.bind(this))
             useBus(this.env.chatBus, 'initAndNotifyConversation', this.initAndNotify.bind(this))
-            useBus(this.env.chatBus, 'searchConversations', this.searchConversations.bind(this))
-            useEffect(() => { this.filterAndOrderConversations() }, () => [this.props.conversations])
+            useBus(this.env.chatBus, 'conversationsReorder', () => {
+                console.log('[acrux-chatroom] conversationsReorder bus')
+                this.filterAndOrderConversations('bus_conversationsReorder')
+            })
+            useEffect(() => {
+                console.log('[acrux-chatroom] ConversationList useEffect deps', { propsConvLen: this.props.conversations?.length ?? 0, uiTick: this.props.uiTick })
+                this.filterAndOrderConversations('use_effect_deps')
+            }, () => [this.props.conversations, this.props.uiTick])
         }
         getInitState() {
             const conversationOrder = browser.localStorage.getItem('chatroomConversationOrder')
@@ -42,7 +48,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
                     chatsFiltered = chatsFiltered.map(item => { return { name: item.name, values: item.values.filter(item2 => item2.values.length > 0) } })
                     chatsFiltered = chatsFiltered.filter(item => item.values.length > 0)
                     this.state.chatsFiltered = chatsFiltered
-                } else { this.filterAndOrderConversations() }
+                } else { this.filterAndOrderConversations('on_filter') }
             }
         }
         onOrder(event) {
@@ -52,7 +58,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
                 const fildName = 'current'
                 this.state.conversationOrder[fildName] = orderChange[this.state.conversationOrder[fildName]]
                 browser.localStorage.setItem('chatroomConversationOrder', JSON.stringify(this.state.conversationOrder))
-                this.filterAndOrderConversations()
+                this.filterAndOrderConversations('on_order_toggle')
             }
         }
         evaluateFilter(conv) {
@@ -62,24 +68,35 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
             if (out && this.state.filterActivity) { out = conv.oldesActivityDate && conv.oldesActivityDate < luxon.DateTime.now() }
             return out
         }
-        filterAndOrderConversations() {
+        filterAndOrderConversations(trigger = 'manual') {
             const conversations = this.props.conversations.filter(this.evaluateFilter.bind(this))
             const order = this.state.conversationOrder
-            const orderFn = (a, b, criteria) => {
-                let out
-                if (criteria === 'desc') { out = a.lastActivity < b.lastActivity } else { out = a.lastActivity > b.lastActivity }
-                return out ? 1 : -1
+            const activityMillis = (c) => {
+                const la = c.lastActivity
+                if (la?.isValid) {
+                    return la.toMillis()
+                }
+                return 0
             }
-            if (['asc', 'desc'].includes(order.current)) { conversations.sort((a, b) => orderFn(a, b, order.current)) }
+            // lock_desc / lock_asc still sort by last_activity (same direction as desc/asc).
+            // Older "Static" semantics froze ordering and blocked updates — that broke reorder after notifications.
+            if (['asc', 'desc', 'lock_asc', 'lock_desc'].includes(order.current)) {
+                const mult = ['desc', 'lock_desc'].includes(order.current) ? -1 : 1
+                conversations.sort(
+                    (a, b) => mult * (activityMillis(a) - activityMillis(b)) || (Number(b.id) || 0) - (Number(a.id) || 0)
+                )
+            }
             this.state.conversations = conversations
             this.state.countNewMsg = conversations.filter(conv => conv.countNewMsg > 0).length
+            const top = conversations.slice(0, 6).map(c => ({ id: c.id, lastActivityMs: activityMillis(c), countNewMsg: c.countNewMsg, status: c.status, }))
+            console.log('[acrux-chatroom] filterAndOrderConversations', { trigger, orderMode: order.current, inputLen: this.props.conversations?.length ?? 0, filteredLen: conversations.length, convsWithUnread: this.state.countNewMsg, top, })
         }
         getSortIcon(str) {
             const orderIcon = { desc: 'fa-arrow-up', asc: 'fa-arrow-down', lock_desc: 'fa-lock', lock_asc: 'fa-lock' }
             return orderIcon[str]
         }
         getSortTitle(str) {
-            const orderTitle = { desc: _t('New Chats Up'), asc: _t('New Chats Down'), lock_desc: _t('Static Order'), lock_asc: _t('Static Order'), }
+            const orderTitle = { desc: _t('New Chats Up'), asc: _t('New Chats Down'), lock_desc: _t('New Chats Up'), lock_asc: _t('New Chats Down'), }
             return orderTitle[str]
         }
         async searchConversations({ detail: { search } }) {
@@ -94,7 +111,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
             this.state.isChatFiltering = false
             this.state.chatFilterResponse = []
             this.state.chatsFiltered = []
-            this.filterAndOrderConversations()
+            this.filterAndOrderConversations('close_filter')
         }
         closeChatFilter() { this.state.isChatFiltering = false }
         async initAndNotify({ detail: { id } }) {
@@ -117,6 +134,6 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-list', ['@web/core/l1
             return out
         }
     }
-    Object.assign(ConversationList, { props: { mobileNavigate: Function, conversations: { type: Array, element: { type: ConversationModel.prototype } }, selectedConversation: { type: ConversationModel.prototype, optional: true }, }, components: { ChatroomHeader, Conversation, ChatSearch, ConversationCard, Transition, }, template: 'chatroom.ConversationList', })
+    Object.assign(ConversationList, { props: { mobileNavigate: Function, conversations: { type: Array, element: { type: ConversationModel.prototype } }, selectedConversation: { type: ConversationModel.prototype, optional: true }, uiTick: { type: Number, optional: true }, }, defaultProps: { uiTick: 0 }, components: { ChatroomHeader, Conversation, ChatSearch, ConversationCard, Transition, }, template: 'chatroom.ConversationList', })
     return __exports;
 });;

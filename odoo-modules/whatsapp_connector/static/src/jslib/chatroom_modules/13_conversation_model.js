@@ -117,12 +117,22 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-model', ['@whatsapp_c
             this.calculateMessageCount()
         }
         calculateMessageCount() {
+            let eligibleLen = 0
+            let lastFromMeIdx = -1
             if (['new', 'current'].includes(this.status)) {
                 const messages = this.messages.filter(msg => !msg.ttype.startsWith('info') && !msg.pendingOutgoing)
+                eligibleLen = messages.length
                 let lastIndexOf
                 if (Array.prototype.findLastIndex) { lastIndexOf = messages.findLastIndex(msg => msg.fromMe) } else { lastIndexOf = messages.map(msg => msg.fromMe).lastIndexOf(true) }
+                lastFromMeIdx = lastIndexOf
                 this.countNewMsg = messages.length - (lastIndexOf + 1)
-            } else { this.countNewMsg = 0 }
+            } else {
+                this.countNewMsg = 0
+            }
+            console.log('[acrux-chatroom] calculateMessageCount', { conversationId: this.id, status: this.status, countNewMsg: this.countNewMsg, eligibleMsgLen: eligibleLen, lastFromMeIdx, totalMessages: this.messages.length, })
+            if (this.env?.chatBus) {
+                this.env.chatBus.trigger('chatUiRefresh')
+            }
         }
         async syncMoreMessage() {
             const persisted = this.realMessageCount()
@@ -213,8 +223,11 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-model', ['@whatsapp_c
         get isPrivate() { return this.convType === 'private' }
         get isGroup() { return this.convType === 'group' }
         async selected() {
-            if (this.isCurrent()) { this.messageSeen() }
+            if (this.isCurrent()) {
+                await this.messageSeen()
+            }
             this.assigned = false
+            this.calculateMessageCount()
         }
         async close() { try { await this.env.services.orm.silent.call(this.env.chatModel, 'close_from_ui', [[this.id]], { context: this.env.context }) } catch (e) { console.error(e) } }
         isOwnerFacebook() { return ['facebook', 'instagram', 'waba_extern'].includes(this.connectorType) }

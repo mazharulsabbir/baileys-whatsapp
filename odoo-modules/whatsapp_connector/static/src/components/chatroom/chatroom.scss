@@ -88,6 +88,14 @@
             font-weight: bold;
             font-size: 1.5em;
         }
+
+        div.o_chatroom_waiting_toggle i {
+            float: none;
+            margin-top: 0;
+            font-weight: bold;
+            font-size: inherit;
+            line-height: 1;
+        }
     }
 
     .navbar-toggler-left,

@@ -10,12 +10,9 @@ odoo.define('@whatsapp_connector/chatroom_mod/story-dialog', ['@web/core/l10n/tr
     const { MessageOptions } = require('@whatsapp_connector/chatroom_mod/message-options')
     const StoryDialog = __exports.StoryDialog = class StoryDialog extends Component {
         static template = xml`
-<Dialog size="'lg'" fullscreen="true" bodyClass="'text-center'" title="props.title">
-    <div href=""
-        t-attf-style="background-image:url('{{props.url}}');width: auto;height: auto;"
-        t-attf-data-mimetype="{{props.mime}}"
-        class="o_Attachment_image o_image o-attachment-viewable o-details-overlay o-medium">
-        <img t-attf-src="{{props.url}}" style="visibility: hidden;max-width: 100%; max-height: calc(100vh/1.5);" />
+<Dialog size="'xl'" fullscreen="true" bodyClass="'o_acrux_story_dialog'" title="props.title">
+    <div class="acrux_story_dialog_frame d-flex justify-content-center align-items-center py-3">
+        <img t-attf-src="{{props.url}}" alt="" loading="lazy" class="acrux_story_dialog_img img-fluid rounded-3 shadow-lg" style="max-width: min(960px, 100%); max-height: calc(100vh - 8rem);" />
     </div>
 </Dialog>`; static components = { Dialog }
         static props = { close: { type: Function, optional: true }, mime: String, url: String, title: String, }
@@ -82,6 +79,6 @@ odoo.define('@whatsapp_connector/chatroom_mod/story-dialog', ['@web/core/l10n/tr
             this.env.chatBus.trigger('inmediateScrollToMessage', data)
         }
     }
-    Object.assign(Message, { template: 'chatroom.Message', props: { message: MessageModel.prototype, noAction: { type: Boolean, optional: true }, }, defaultProps: { noAction: false, }, components: { AttachmentList, AudioPlayer, MessageMetadata, Many2OneAvatarField, MessageOptions, Message, } })
+    Object.assign(Message, { template: 'chatroom.Message', props: { message: MessageModel.prototype, noAction: { type: Boolean, optional: true }, timeTick: { type: Number, optional: true }, }, defaultProps: { noAction: false, timeTick: 0 }, components: { AttachmentList, AudioPlayer, MessageMetadata, Many2OneAvatarField, MessageOptions, Message, } })
     return __exports;
 });;

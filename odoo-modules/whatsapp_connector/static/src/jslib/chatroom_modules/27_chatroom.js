@@ -5,7 +5,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
     const { SIZES } = require('@web/core/ui/ui_service')
     const { url } = require('@web/core/utils/urls')
     const { browser } = require('@web/core/browser/browser')
-    const { Component, EventBus, useSubEnv, useState, onWillStart, useRef } = require('@odoo/owl')
+    const { Component, EventBus, useSubEnv, useState, onWillStart, useRef, onMounted, onWillUnmount } = require('@odoo/owl')
     const { useBus } = require('@web/core/utils/hooks')
     const { ChatroomHeader } = require('@whatsapp_connector/chatroom_mod/chatroom-header')
     const { ConversationList } = require('@whatsapp_connector/chatroom_mod/conversation-list')
@@ -42,6 +42,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
             useBus(this.env.chatBus, 'deleteConversation', this.deleteConversation.bind(this))
             useBus(this.env.chatBus, 'mobileNavigate', this.mobileNavigate.bind(this))
             useBus(this.env.chatBus, 'selectTab', this.updateTab.bind(this))
+            useBus(this.env.chatBus, 'chatUiRefresh', () => this.bumpUiTick('chatUiRefresh'))
             useBus(this.env.services.bus_service, 'notification', this.onNotification.bind(this))
             useBus(this.env.services.ui.bus, 'resize', this.resize.bind(this))
             useBus(document, 'visibilitychange', this.visibilityChange)
@@ -52,6 +53,21 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
                 this.env.bus.removeEventListener('ACTION_MANAGER:UI-UPDATED', updateMyController)
             }
             this.env.bus.addEventListener('ACTION_MANAGER:UI-UPDATED', updateMyController)
+            this._uiTickInterval = null
+            onMounted(() => {
+                browser.setTimeout(() => this.bumpUiTick('delayed_boot_2s'), 2000)
+                this._uiTickInterval = browser.setInterval(() => this.bumpUiTick('interval_30s'), 30 * 1000)
+            })
+            onWillUnmount(() => {
+                if (this._uiTickInterval) {
+                    browser.clearInterval(this._uiTickInterval)
+                }
+            })
+        }
+        bumpUiTick(reason = 'unknown') {
+            const prev = this.state.uiTick
+            this.state.uiTick++
+            console.log('[acrux-chatroom] uiTick bump', { reason, prev, next: this.state.uiTick, selectedConvId: this.state.selectedConversation?.id ?? null, convListLen: this.state.conversations?.length ?? 0, })
         }
         getInitState() {
             const chatroomTabSize = parseInt(browser.localStorage.getItem('chatroomTabSize') || '0')
@@ -65,7 +81,7 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
             } else if (browser.localStorage.getItem('chatroomFocusChatOnly') === '1') {
                 focusMode = 1
             }
-            return { user: new UserModel(this), selectedConversation: null, conversations: [], currentMobileSide: '', renderForms: false, chatroomTabSize, tabSelected: this.props.tabSelected || 'tab_default_answer', focusMode, }
+            return { user: new UserModel(this), selectedConversation: null, conversations: [], currentMobileSide: '', renderForms: false, chatroomTabSize, tabSelected: this.props.tabSelected || 'tab_default_answer', focusMode, uiTick: 0, }
         }
         getSubEnv() { return { context: this.props.action.context, chatBus: new EventBus(), chatModel: 'acrux.chat.conversation', getCurrency: () => this.currencyId, chatroomJsId: this.props.action.jsId, getShowUser: () => this.showUserInMessage, canTranscribe: () => this.canTranscribe, canTranslate: () => this.canTranslate, getCurrentLang: () => this.currentLang, isVerticalView: () => this.state.user?.tabOrientation === 'vertical', isAdmin: () => this.isAdmin, } }
         async willStart() {
@@ -170,6 +186,8 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
             }
             this.state.conversations = conversations.filter(conv => this.canHaveThisConversation(conv))
             if (replaceSelectedConversation) { this.replaceSelectedConversation() }
+            console.log('[acrux-chatroom] upsertConversation -> conversationsReorder', { updatedIds: out.map(c => c.id), filteredCount: this.state.conversations.length, })
+            this.env.chatBus.trigger('conversationsReorder')
             return out.filter(item => this.state.conversations.includes(item))
         }
         replaceSelectedConversation() {
@@ -194,11 +212,15 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
                 await conv.selected()
                 this.env.chatBus.trigger('mobileNavigate', 'middleSide')
             }
+            this.bumpUiTick('selectConversation')
         }
         async onNotification({ detail: notifications }) {
             if (notifications) {
+                const types = [...new Set(notifications.map(n => n.type).filter(Boolean))]
+                console.log('[acrux-chatroom] bus notification batch', { count: notifications.length, types, })
                 const proms = notifications.map(d => this.notifactionProcessor(d))
                 await Promise.all(proms)
+                this.bumpUiTick('notifications_processed')
             }
         }
         async notifactionProcessor(data) {
@@ -253,6 +275,8 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
             if (conv) {
                 conv.updateFromJson(convData)
                 await conv.buildExtraObj()
+                console.log('[acrux-chatroom] onErrorMessages -> conversationsReorder', { convId: conv.id, })
+                this.env.chatBus.trigger('conversationsReorder')
                 const messageIds = convData.messages.map(msg => msg.id)
                 const message = conv.messages.find(msg => messageIds.includes(msg.id))
                 this.env.services.dialog.add(WarningDialog, { message: _t('Error in conversation with ') + conv.name }, {
@@ -284,7 +308,16 @@ odoo.define('@whatsapp_connector/chatroom_mod/chatroom', ['@web/core/l10n/transl
                 },
             })
         }
-        visibilityChange() { if (!document.hidden && this.state.selectedConversation && this.state.selectedConversation.isCurrent()) { this.state.selectedConversation.messageSeen() } }
+        visibilityChange() {
+            if (!document.hidden && this.state.selectedConversation && this.state.selectedConversation.isCurrent()) {
+                this.state.selectedConversation.messageSeen()
+            }
+            if (!document.hidden) {
+                this.bumpUiTick('visibility_visible')
+            } else {
+                console.log('[acrux-chatroom] visibility hidden (no uiTick)')
+            }
+        }
         mobileNavigate({ detail: target }) { if (this.env.services.ui.size <= SIZES.MD) { this.state.currentMobileSide = target } }
         get firtSideMobile() {
             let out = ''

@@ -1,4 +1,4 @@
-odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/browser', '@web/core/checkbox/checkbox', '@web/core/utils/hooks', '@web/core/transition', '@web/core/select_menu/select_menu', '@web/core/l10n/translation', '@odoo/owl', '@whatsapp_connector/chatroom_mod/emojis', '@whatsapp_connector/chatroom_mod/activity-button', '@whatsapp_connector/chatroom_mod/use-attachment-uploader', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/message-model', '@whatsapp_connector/chatroom_mod/user-model', '@whatsapp_connector/chatroom_mod/attachment-list', '@whatsapp_connector/chatroom_mod/file-uploader', '@whatsapp_connector/chatroom_mod/story-dialog'], function (require) {
+odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/browser', '@web/core/checkbox/checkbox', '@web/core/utils/hooks', '@web/core/transition', '@web/core/select_menu/select_menu', '@web/core/l10n/translation', '@web/core/errors/error_dialogs', '@odoo/owl', '@whatsapp_connector/chatroom_mod/emojis', '@whatsapp_connector/chatroom_mod/activity-button', '@whatsapp_connector/chatroom_mod/use-attachment-uploader', '@whatsapp_connector/chatroom_mod/conversation-model', '@whatsapp_connector/chatroom_mod/message-model', '@whatsapp_connector/chatroom_mod/user-model', '@whatsapp_connector/chatroom_mod/attachment-list', '@whatsapp_connector/chatroom_mod/file-uploader', '@whatsapp_connector/chatroom_mod/story-dialog', '@whatsapp_connector/chatroom_mod/default-answer-send'], function (require) {
     'use strict'; let __exports = {}; const { _t } = require('@web/core/l10n/translation'); const { browser } = require('@web/core/browser/browser')
     const { CheckBox } = require('@web/core/checkbox/checkbox')
     const { useAutofocus } = require('@web/core/utils/hooks')
@@ -15,6 +15,8 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
     const { AttachmentList } = require('@whatsapp_connector/chatroom_mod/attachment-list')
     const { FileUploader } = require('@whatsapp_connector/chatroom_mod/file-uploader')
     const { Message } = require('@whatsapp_connector/chatroom_mod/story-dialog')
+    const { WarningDialog } = require('@web/core/errors/error_dialogs')
+    const DA = require('@whatsapp_connector/chatroom_mod/default-answer-send')
     const Toolbox = __exports.Toolbox = class Toolbox extends Component {
         setup() {
             super.setup()
@@ -85,10 +87,71 @@ odoo.define('@whatsapp_connector/chatroom_mod/toolbox', ['@web/core/browser/brow
             const answers = this.props.defaultAnswers || []
             return [...answers].sort((a, b) => (a.sequence || 0) - (b.sequence || 0)).slice(0, 8)
         }
-        insertSnippet(answer) {
-            if (!answer?.text || !this.inputRef.el) { return }
-            const chunk = String(answer.text).trim()
-            if (!chunk) { return }
+        getSnippetChipTitle(answer) {
+            return DA.getSnippetChipTitle(answer)
+        }
+        async insertSnippet(answer) {
+            if (!this.inputRef.el) {
+                return
+            }
+            if (!answer) {
+                return
+            }
+            if (!this.props.selectedConversation?.isCurrent()) {
+                this.env.services.dialog.add(WarningDialog, { message: _t('You must select a conversation.') })
+                return
+            }
+            if (DA.snippetUsesCreateMessage(answer)) {
+                if (DA.snippetNeedsAttachment(answer) && (!answer.resModel || !answer.resId)) {
+                    this.env.services.dialog.add(WarningDialog, { message: _t('This default reply has no file attached. Configure it under Default Answers.') })
+                    return
+                }
+                const opts = DA.buildSendOptions(answer, {})
+                try {
+                    await this.props.selectedConversation.createMessage(opts)
+                } catch (e) {
+                    this.env.services.dialog.add(WarningDialog, { message: String(e.message || e) })
+                }
+                return
+            }
+            let codeResult = undefined
+            if (answer.ttype === 'code') {
+                try {
+                    codeResult = await this.env.services.orm.call('acrux.chat.default.answer', 'eval_answer',
+                        [[answer.id], this.props.selectedConversation.id], { context: this.env.context })
+                } catch (e) {
+                    this.env.services.dialog.add(WarningDialog, { message: String(e.message || e) })
+                    return
+                }
+                if (codeResult === null || codeResult === undefined) {
+                    this.env.services.dialog.add(WarningDialog, { message: _t('This snippet did not return any text (set `result` in the Python code).') })
+                    return
+                }
+                if (String(codeResult).trim() === '') {
+                    this.env.services.dialog.add(WarningDialog, { message: _t('The Python snippet returned an empty message.') })
+                    return
+                }
+                const opts = DA.buildSendOptions(answer, { codeResult })
+                const txt = opts.text !== null && opts.text !== undefined ? String(opts.text) : ''
+                if (!txt.trim()) {
+                    return
+                }
+                const cur = this.inputRef.el.value
+                const spacer = cur && !cur.endsWith('\n') ? '\n' : ''
+                const langVal = this.inputLangRef.el ? this.inputLangRef.el.value : undefined
+                this.env.chatBus.trigger('setInputText', [`${cur}${spacer}${txt}`, langVal])
+                this.inputRef.el.focus()
+                this.scheduleDraftSave()
+                return
+            }
+            if (!answer.text && !answer.name) {
+                return
+            }
+            const txt = DA.resolveFallbackText(answer)
+            const chunk = String(txt).trim()
+            if (!chunk) {
+                return
+            }
             const cur = this.inputRef.el.value
             const spacer = cur && !cur.endsWith('\n') ? '\n' : ''
             const langVal = this.inputLangRef.el ? this.inputLangRef.el.value : undefined

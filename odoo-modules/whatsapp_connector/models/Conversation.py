@@ -7,9 +7,11 @@ from odoo.exceptions import ValidationError
 from odoo.tools import formatLang
 from odoo.tools.safe_eval import safe_eval
 from datetime import datetime, date
+
 from ..tools import DEFAULT_IMAGE_URL
 from ..tools import get_image_url, get_image_from_url, get_binary_attach
-from ..tools import date_timedelta, date2sure_write
+from ..tools import date_timedelta, date2sure_write, unix_ts_to_naive_utc
+
 _logger = logging.getLogger(__name__)
 
 AVAILABLE_PRIORITIES = [
@@ -836,7 +838,9 @@ class AcruxChatConversation(models.Model):
             text = text or 'Message type Not allowed (%s).' % ttype
             ttype = 'text'
         if message.get('time'):
-            date_msg = datetime.fromtimestamp(message.get('time'))
+            date_msg = unix_ts_to_naive_utc(message.get('time'))
+            if not date_msg:
+                date_msg = fields.Datetime.now()
         else:
             date_msg = fields.Datetime.now()
         out = {

@@ -3,7 +3,8 @@
 
     <t t-name="chatroom.ConversationList" owl="1">
         <div class="o_ConversationList flex-grow-1 d-flex flex-column overflow-hidden w-100"
-            t-ref="containerRef">
+            t-ref="containerRef"
+            t-att-data-ui-tick="props.uiTick">
             <div class="d-flex my-1 px-1">
                 <ChatSearch placeHolder="conversationFilterHolder"
                     searchEvent="'searchConversations'"
@@ -80,20 +81,21 @@
             <div class="flex-grow-1 d-flex flex-column overflow-hidden o_chatlist w-100" t-else="">
                 <div class="d-flex flex-column overflow-auto w-100 flex-grow-0 flex-shrink-1 flex-basis-auto">
                     <t t-foreach="currentConversations" t-as="conv" t-key="conv.id">
-                        <Conversation selectedConversation="props.selectedConversation" conversation="conv" />
+                        <Conversation selectedConversation="props.selectedConversation" conversation="conv" listTick="props.uiTick" />
                     </t>
                 </div>
                 <ChatroomHeader className="'o_chatroom_header_alt w-100'">
-                    <div class="cursor-pointer overflow-hidden" t-on-click="onToggleShowWaitingHeader">
+                    <div class="o_chatroom_waiting_toggle d-flex align-items-center justify-content-end gap-2 cursor-pointer overflow-hidden px-1"
+                        t-on-click="onToggleShowWaitingHeader">
                         <Transition visible="state.showWaitingHeader" name="'o-fade'" leaveDuration="200">
                             <span>Waiting</span>
                         </Transition>
-                        <i class="fa fa-sm fa-chevron-down" title="Waiting"/>
+                        <i class="fa fa-fw fa-lg fa-chevron-down" title="Waiting"/>
                     </div>
                 </ChatroomHeader>
                 <div class="d-flex flex-column overflow-auto w-100 flex-grow-1 flex-shrink-1 flex-basis-auto">
                     <t t-foreach="waintingConversations" t-as="conv" t-key="conv.id">
-                        <Conversation selectedConversation="props.selectedConversation" conversation="conv" />
+                        <Conversation selectedConversation="props.selectedConversation" conversation="conv" listTick="props.uiTick" />
                     </t>
                 </div>
             </div>

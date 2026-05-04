@@ -19,7 +19,12 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@web/core/
             this.loadMoreMessage = false
             this.scrollToPrevMessage = null
             this.messageToScroll = null
-            onWillUpdateProps(this.willUpdateProps.bind(this))
+            onWillUpdateProps((nextProps) => {
+                if (nextProps.uiTick !== this.props.uiTick) {
+                    console.log('[acrux-chatroom] ConversationThread uiTick (relative time refresh)', { prev: this.props.uiTick, next: nextProps.uiTick, convId: this.props.selectedConversation?.id ?? null, messageCount: this.props.selectedConversation?.messages?.length ?? 0, })
+                }
+                this.willUpdateProps()
+            })
             onMounted(this.checkScroll.bind(this))
             onPatched(this.checkScroll.bind(this))
         }
@@ -106,6 +111,6 @@ odoo.define('@whatsapp_connector/chatroom_mod/conversation-thread', ['@web/core/
         async productDrop({ detail: { x, y, product } }) { if (this.isInside(x, y) && this.props.selectedConversation?.isCurrent()) { await this.props.selectedConversation.sendProduct(product.id) } }
         setMessageToScroll({ detail: { message } }) { this.messageToScroll = message }
     }
-    Object.assign(ConversationThread, { template: 'chatroom.ConversationThread', props: { selectedConversation: ConversationModel.prototype, }, components: { Message } })
+    Object.assign(ConversationThread, { template: 'chatroom.ConversationThread', props: { selectedConversation: ConversationModel.prototype, uiTick: { type: Number, optional: true }, }, defaultProps: { uiTick: 0 }, components: { Message } })
     return __exports;
-});;
+});

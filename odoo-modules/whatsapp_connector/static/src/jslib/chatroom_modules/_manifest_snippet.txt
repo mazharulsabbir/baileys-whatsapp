@@ -34,6 +34,7 @@
             'whatsapp_connector/static/src/jslib/chatroom_modules/32_conversation_name.js',
             'whatsapp_connector/static/src/jslib/chatroom_modules/33_conversation_thread.js',
             'whatsapp_connector/static/src/jslib/chatroom_modules/34_conversation_list.js',
+            'whatsapp_connector/static/src/jslib/chatroom_modules/47_default_answer_send.js',
             'whatsapp_connector/static/src/jslib/chatroom_modules/35_default_answer.js',
             'whatsapp_connector/static/src/jslib/chatroom_modules/36_emojis.js',
             'whatsapp_connector/static/src/jslib/chatroom_modules/37_story_dialog.js',

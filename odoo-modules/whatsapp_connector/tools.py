@@ -8,7 +8,7 @@ import logging
 import mimetypes
 import re
 from os.path import basename
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import phonenumbers
 from PIL import Image
 from odoo import fields, _, SUPERUSER_ID
@@ -30,6 +30,19 @@ def log_request_error(param, req=None):
     except Exception:
         pass
     _logger.error(param, exc_info=True)
+
+
+def unix_ts_to_naive_utc(ts):
+    """Unix epoch seconds (or ms) → naive UTC datetime for Odoo ``fields.Datetime``."""
+    if ts in (None, False):
+        return None
+    try:
+        val = float(ts)
+    except (TypeError, ValueError):
+        return None
+    if val > 1e12:
+        val = val / 1000.0
+    return datetime.fromtimestamp(val, tz=timezone.utc).replace(tzinfo=None)
 
 
 def date2sure_str(value):

@@ -3,6 +3,7 @@
 
     <t t-name="chatroom.Conversation" owl="1">
         <div class="o_Conversation" t-att-data-id="props.conversation.id"
+            t-att-data-list-tick="props.listTick"
             t-attf-style="border-color: {{props.conversation.borderColor == '#FFFFFF' ? 'transparent': props.conversation.borderColor}}"
             t-attf-class="acrux_chat_color {{ isSelected ? 'active': '' }}" t-on-click="onSelect">
             <div class="acrux_image_perfil">
