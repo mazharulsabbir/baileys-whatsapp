@@ -2493,6 +2493,37 @@ label {
   color: var(--muted);
 }
 
+.subscription-quota-block {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.35rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(10, 14, 22, 0.55));
+}
+
+.subscription-quota-figures {
+  margin: 0.4rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.subscription-quota-sep,
+.subscription-quota-unit {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.subscription-quota-plan {
+  margin: 0.55rem 0 0 !important;
+}
+
+.subscription-period-code {
+  font-size: 0.8rem;
+}
+
 .subscription-renewal-block {
   position: relative;
   z-index: 1;
@@ -2553,6 +2584,237 @@ label {
 
 .subscription-aside-list li + li {
   margin-top: 0.5rem;
+}
+
+.billing-history-card {
+  margin-top: 1.35rem;
+}
+
+.billing-history-head {
+  margin-bottom: 1rem;
+}
+
+.billing-history-lead {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.billing-history-lead code {
+  font-size: 0.84em;
+}
+
+.billing-history-empty {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.billing-history-table-wrap {
+  margin-top: 0.35rem;
+}
+
+.payment-tran-id {
+  display: inline-block;
+  max-width: 100%;
+  font-size: 0.72rem;
+  font-weight: 600;
+  word-break: break-all;
+  color: #e2e8f0;
+}
+
+.payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.payment-status-badge.is-paid {
+  color: #bbf7d0;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.payment-status-badge.is-pending {
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.payment-status-badge.is-failed {
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.payment-status-badge.is-muted {
+  color: var(--muted);
+  border: 1px solid rgba(37, 45, 58, 0.95);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.usage-quota-meter {
+  margin-top: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(6, 9, 14, 0.45);
+}
+
+.usage-quota-meter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.usage-quota-meter-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.usage-quota-meter-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.usage-quota-meter-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(37, 45, 58, 0.95);
+  overflow: hidden;
+}
+
+.usage-quota-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.9), rgba(34, 197, 94, 0.85));
+}
+
+.usage-quota-meter-hint {
+  margin: 0.65rem 0 0 !important;
+  font-size: 0.82rem !important;
+}
+
+.usage-alert-settings {
+  margin-top: 1.35rem;
+}
+
+.usage-alert-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.usage-alert-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cyan-dim, #7dd3fc);
+  white-space: nowrap;
+}
+
+.usage-alert-lead {
+  margin: 0.65rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.58;
+  color: var(--muted);
+}
+
+.usage-alert-code {
+  font-size: 0.84em;
+  padding: 0.12rem 0.35rem;
+  border-radius: 6px;
+  background: rgba(6, 9, 14, 0.65);
+  border: 1px solid rgba(37, 45, 58, 0.85);
+  color: #e2e8f0;
+}
+
+.usage-alert-master {
+  margin-top: 1.15rem;
+}
+
+.usage-alert-panel {
+  margin-top: 0.85rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(6, 9, 14, 0.45);
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.usage-alert-panel.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  border-color: rgba(37, 45, 58, 0.75);
+}
+
+.usage-alert-panel-title {
+  margin: 0 0 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.usage-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.usage-alert-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem 0.95rem;
+  align-items: start;
+  margin: 0;
+  cursor: pointer;
+}
+
+.usage-alert-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.usage-alert-row-title {
+  font-size: 0.93rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e2e8f0;
+}
+
+.usage-alert-row-desc {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.usage-alert-input {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0.2rem 0 0;
+  accent-color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.usage-alert-footnote {
+  margin: 1rem 0 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.5;
 }
 
 .dashboard-page-head .dashboard-eyebrow:first-child {

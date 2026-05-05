@@ -1,6 +1,6 @@
-# Baileys WhatsApp Bot
+# RelayLink
 
-A powerful WhatsApp Web API integration using the [Baileys](https://github.com/WhiskeySockets/Baileys) library. Build WhatsApp bots, send messages, manage groups, and more without browser dependencies.
+**RelayLink** is a production WhatsApp Web connectivity platform — multi-tenant dashboard, SSLCommerz (BDT) billing, quota-aware REST APIs, and Odoo-friendly gateway integrations. The always-on messaging runtime is powered by the open-source [Baileys](https://github.com/WhiskeySockets/Baileys) WhatsApp Web stack (plus the bundled CLI bot for direct experiments).
 
 ## Features
 

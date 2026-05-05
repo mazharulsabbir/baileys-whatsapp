@@ -5,6 +5,7 @@ import {
   resolveUserIdFromApiKey,
 } from '@/lib/integration-auth';
 import { recordApiUsage } from '@/lib/api-usage';
+import { assertMonthlyQuotaAllowsNextCall } from '@/lib/quota';
 import { getExistingService } from '@/lib/whatsapp-registry';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,11 @@ export async function GET(request: Request) {
   const entitled = await hasActiveEntitlement(userId);
   if (!entitled) {
     return NextResponse.json({ error: 'Active subscription required' }, { status: 403 });
+  }
+
+  const quotaExceeded = await assertMonthlyQuotaAllowsNextCall(userId);
+  if (quotaExceeded) {
+    return quotaExceeded;
   }
 
   const svc = getExistingService(userId);

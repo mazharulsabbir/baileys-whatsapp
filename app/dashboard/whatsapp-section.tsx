@@ -87,7 +87,7 @@ export function WhatsAppSection({ hasActive }: Props) {
           <span className="integration-toolbar-label">Live socket</span>
           <strong className="integration-toolbar-title">{connected ? 'Handset linked' : 'Awaiting handset'}</strong>
           <span className="integration-toolbar-hint">
-            Polling mirrors what Baileys reports — refreshes roughly every{' '}
+            Polling mirrors what the platform reports — refreshes roughly every{' '}
             <code className="integration-inline-code">2.5s</code> while this route is mounted.
           </span>
         </div>
@@ -114,7 +114,7 @@ export function WhatsAppSection({ hasActive }: Props) {
           <span className="integration-section-chip">WhatsApp Web</span>
           <h2 className="integration-section-title">Pair this tenant</h2>
           <p className="integration-section-lead">
-            Generates a disposable QR PNG through Baileys. Scanning binds <strong>this browser session&apos;s tenant</strong> to your
+            Generates a disposable PNG for pairing. Scanning binds <strong>this browser session&apos;s tenant</strong> to your
             number — unrelated environments keep their own auth folders on disk.
           </p>
         </header>
@@ -162,7 +162,7 @@ export function WhatsAppSection({ hasActive }: Props) {
                   </div>
                   <p className="whatsapp-qr-state-title">Session online</p>
                   <p className="whatsapp-qr-state-copy">
-                    API traffic routes through Baileys for this tenant. If another browser opens the same number, WhatsApp may
+                    API traffic uses this tenant&apos;s paired WhatsApp Web socket. If another browser opens the same number, WhatsApp may
                     show <strong>connected elsewhere</strong> — check{' '}
                     <Link href="/dashboard/integration">integration health</Link> if sends fail silently.
                   </p>
@@ -194,7 +194,7 @@ export function WhatsAppSection({ hasActive }: Props) {
             <h3 className="whatsapp-qr-heading">Field notes</h3>
             <ul className="whatsapp-field-list">
               <li>Primary consumer app and WhatsApp Business are both supported.</li>
-              <li>Expired bitmap? Hit <strong>Connect / refresh QR</strong> — Baileys rotates pair payload quickly.</li>
+              <li>Expired bitmap? Hit <strong>Connect / refresh QR</strong> — pairing payloads rotate quickly.</li>
               <li>
                 Unlinked on the phone? Status falls back to <strong>Not connected</strong> within a couple of poll cycles.
               </li>

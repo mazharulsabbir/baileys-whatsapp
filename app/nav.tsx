@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { auth } from '@/auth';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { SignOutButton } from './sign-out-button';
 
 export async function Nav() {
@@ -11,7 +12,7 @@ export async function Nav() {
         <div className="section-inner nav-inner">
           <Link href="/dashboard" className="nav-brand">
             <span className="nav-logo-mark" aria-hidden />
-            <span>Baileys SaaS</span>
+            <span>{PRODUCT_NAME}</span>
           </Link>
 
           <nav className="nav-desktop nav-desktop-app" aria-label="App">
@@ -55,7 +56,7 @@ export async function Nav() {
       <div className="section-inner nav-inner">
         <Link href="/" className="nav-brand">
           <span className="nav-logo-mark" aria-hidden />
-          <span>Baileys SaaS</span>
+          <span>{PRODUCT_NAME}</span>
         </Link>
 
         <nav className="nav-desktop" aria-label="Primary">

@@ -14,12 +14,31 @@ model User {
   name           String?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
-  payments       Payment[]
-  entitlement    Entitlement?
-  integration    IntegrationCredential?
-  odooGateway    OdooGatewayCredential?
-  apiUsageEvents ApiUsageEvent[]
-  odooWebhookDlq OdooWebhookDeadLetter[]
+  /// Monthly API quota email alerts (75% / 85% / 95% of plan limit, UTC month).
+  usageQuotaAlertsEnabled Boolean        @default(true)
+  usageAlertAt75          Boolean        @default(true)
+  usageAlertAt85          Boolean        @default(true)
+  usageAlertAt95          Boolean        @default(true)
+  payments                Payment[]
+  entitlement             Entitlement?
+  integration             IntegrationCredential?
+  odooGateway             OdooGatewayCredential?
+  apiUsageEvents          ApiUsageEvent[]
+  odooWebhookDlq          OdooWebhookDeadLetter[]
+  usageQuotaAlertLogs     UsageQuotaAlertLog[]
+}
+
+/// One row per (user, UTC month, threshold) once an alert email is sent.
+model UsageQuotaAlertLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodKey  String
+  threshold  Int
+  sentAt     DateTime @default(now())
+
+  @@unique([userId, periodKey, threshold])
+  @@index([userId])
 }
 
 /// Odoo ChatRoom connector credentials (gateway headers token + client_id).

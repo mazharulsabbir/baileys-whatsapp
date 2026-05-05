@@ -7,6 +7,7 @@ import {
 } from '@/lib/integration-auth';
 import { normalizeToJid } from '@/lib/jid';
 import { recordApiUsage } from '@/lib/api-usage';
+import { assertMonthlyQuotaAllowsNextCall } from '@/lib/quota';
 import { rateLimit } from '@/lib/rate-limit';
 import { ensureConnecting, getExistingService } from '@/lib/whatsapp-registry';
 
@@ -37,6 +38,11 @@ export async function POST(req: Request) {
   const entitled = await hasActiveEntitlement(userId);
   if (!entitled) {
     return NextResponse.json({ error: 'Active subscription required' }, { status: 403 });
+  }
+
+  const quotaExceeded = await assertMonthlyQuotaAllowsNextCall(userId);
+  if (quotaExceeded) {
+    return quotaExceeded;
   }
 
   let json: unknown;

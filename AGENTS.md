@@ -4,7 +4,7 @@ Use this file together with `.cursor/rules/` when planning or editing code in th
 
 ## Product context
 
-Node.js WhatsApp Web client built on [Baileys](https://github.com/WhiskeySockets/Baileys). The main abstraction is `WhatsAppService` (`src/services/whatsapp.ts`); use `createWhatsAppService({ tenantId, authBaseDir, ... })` for SaaS tenants. Next.js lives under `app/` with Prisma and SSLCommerz helpers under `lib/` (`lib/whatsapp-registry.ts` holds active sockets). The legacy CLI uses `createDefaultWhatsAppService()` via `src/index.ts`. Commands are handled in `src/handlers/message.handler.ts`; connection logic in `src/handlers/connection.handler.ts`.
+**RelayLink** — WhatsApp Web platform built on [Baileys](https://github.com/WhiskeySockets/Baileys). The main abstraction is `WhatsAppService` (`src/services/whatsapp.ts`); use `createWhatsAppService({ tenantId, authBaseDir, ... })` for SaaS tenants. Next.js lives under `app/` with Prisma and SSLCommerz helpers under `lib/` (`lib/whatsapp-registry.ts` holds active sockets). The legacy CLI uses `createDefaultWhatsAppService()` via `src/index.ts`. Commands are handled in `src/handlers/message.handler.ts`; connection logic in `src/handlers/connection.handler.ts`.
 
 ## Environment and run
 

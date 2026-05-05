@@ -1,6 +1,8 @@
+import { evaluateQuotaUsageAlerts } from '@/lib/usage-alerts';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { getMonthlyQuotaStatus, getUtcBillingMonth } from '@/lib/quota';
 
 function missingApiUsageTable(e: unknown): boolean {
   if (!(e instanceof Prisma.PrismaClientKnownRequestError)) {
@@ -22,6 +24,9 @@ export async function recordApiUsage(userId: string, route: UsageRoute): Promise
     await prisma.apiUsageEvent.create({
       data: { userId, route },
     });
+    void evaluateQuotaUsageAlerts(userId).catch((err) => {
+      console.error('[api-usage] evaluateQuotaUsageAlerts', err);
+    });
   } catch (e) {
     if (missingApiUsageTable(e)) {
       console.warn(
@@ -37,6 +42,13 @@ export type UsageSummary = {
   totals: { last24h: number; last7d: number; last30d: number };
   /** ISO date (UTC midnight) -> counts */
   byDay: { day: string; messages: number; status: number }[];
+  /** Monthly API quota (UTC calendar month); only meaningful with an active plan. */
+  quota: {
+    unlimited: boolean;
+    limit: number | null;
+    used: number;
+    periodKey: string;
+  };
 };
 
 function emptyUsageSummary(): UsageSummary {
@@ -50,9 +62,16 @@ function emptyUsageSummary(): UsageSummary {
     const key = day.toISOString().slice(0, 10);
     byDay.push({ day: key, messages: 0, status: 0 });
   }
+  const { periodKey } = getUtcBillingMonth();
   return {
     totals: { last24h: 0, last7d: 0, last30d: 0 },
     byDay,
+    quota: {
+      unlimited: true,
+      limit: null,
+      used: 0,
+      periodKey,
+    },
   };
 }
 
@@ -129,8 +148,15 @@ export async function getUsageSummary(userId: string): Promise<UsageSummary> {
     byDay.push({ day: key, ...counts });
   }
 
+  const q = await getMonthlyQuotaStatus(userId);
   return {
     totals: { last24h, last7d, last30d },
     byDay,
+    quota: {
+      unlimited: q.unlimited,
+      limit: q.limit,
+      used: q.used,
+      periodKey: q.periodKey,
+    },
   };
 }

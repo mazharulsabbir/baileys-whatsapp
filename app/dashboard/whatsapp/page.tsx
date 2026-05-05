@@ -11,9 +11,9 @@ export default async function DashboardWhatsAppPage() {
         <p className="dashboard-eyebrow">Messaging</p>
         <h1>WhatsApp</h1>
         <p className="dashboard-lead">
-          This console pairs one <strong>Baileys</strong> (WhatsApp Web) session per tenant. After you scan, outbound API
-          calls and inbound webhooks use that live socket — revoke from the phone or use <strong>Disconnect</strong> here
-          to wipe it.
+          This console pairs one <strong>WhatsApp Web</strong> session per tenant. After you scan, outbound API calls and
+          inbound webhooks use that live socket — revoke from the phone or use <strong>Disconnect</strong> here to wipe
+          it.
         </p>
       </header>
 

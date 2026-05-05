@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { PLANS } from '@/lib/plans';
+import { formatApiQuotaLabel, PLANS } from '@/lib/plans';
 
 export default function PricingPage() {
   const { data: session, status } = useSession();
@@ -54,8 +54,8 @@ export default function PricingPage() {
           <p className="pricing-eyebrow">Billing</p>
           <h1>Plans that unlock the stack</h1>
           <p className="pricing-lead">
-            Pay with <strong>SSLCommerz</strong> in BDT. Checkout returns you here; entitlement applies automatically via
-            IPN — no spreadsheets or license files.
+            Pay with <strong>SSLCommerz</strong> in BDT. Each tier includes a <strong>monthly API call budget</strong>{' '}
+            (UTC calendar month) on top of your paid-through date — entitlement applies automatically via IPN.
           </p>
           <div className="pricing-trust-strip">
             <span className="pricing-trust-pill">
@@ -104,7 +104,9 @@ export default function PricingPage() {
                     <span className="plan-currency">৳</span>
                     {plan.amount}
                   </p>
-                  <p className="plan-billing">per {plan.durationDays} days · {plan.currency}</p>
+                  <p className="plan-billing">
+                    {formatApiQuotaLabel(plan.monthlyApiQuota)} · {plan.durationDays}-day access window ({plan.currency})
+                  </p>
                 </div>
 
                 <ul className="plan-features" aria-label={`${plan.name} includes`}>
@@ -155,9 +157,9 @@ export default function PricingPage() {
         <section className="pricing-faq-strip" aria-label="Billing notes">
           <h3 className="pricing-faq-title">How renewal works</h3>
           <ul className="pricing-faq-list">
-            <li>Active plans show instantly in your dashboard entitlement card after IPN confirms.</li>
-            <li>Failures or cancellations return you here — your session stays safe; retry anytime.</li>
-            <li>Questions about an invoice belong in email support with your tran_id from SSLCommerz.</li>
+            <li>After IPN, your dashboard shows plan tier, paid-through date, and live API usage against the UTC month.</li>
+            <li>Tiers cap total integration API calls per month (messages + status); unlimited skips the cap.</li>
+            <li>Reach 75% / 85% / 95% of quota — optional emails from Account (SMTP required on the server).</li>
           </ul>
         </section>
       </div>

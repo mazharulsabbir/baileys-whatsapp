@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { ReviewsSection } from '@/components/marketing/reviews-section';
 import { CtaSection } from '@/components/marketing/cta-section';
 
 export const metadata: Metadata = {
   title: 'Reviews',
-  description: 'What operators say about Baileys SaaS — QR onboarding, SSLCommerz billing, and integration APIs.',
+  description: `What operators say about ${PRODUCT_NAME} — QR onboarding, SSLCommerz billing, and integration APIs.`,
 };
 
 export default function ReviewsPage() {

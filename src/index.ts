@@ -25,7 +25,7 @@ function clearSessionData(): void {
  * Main application entry point
  */
 async function main(): Promise<void> {
-  logger.info('🚀 Starting Baileys WhatsApp Bot...');
+  logger.info('🚀 Starting RelayLink WhatsApp connector...');
   logger.info(`Session: ${config.sessionName}`);
   logger.info(`Auth Method: ${config.authMethod}`);
   logger.info(`Command Prefix: ${config.commandPrefix}`);

@@ -304,7 +304,7 @@ async function handleCommand(
 
     case 'info':
       await socket.sendMessage(chatId, {
-        text: `*Baileys WhatsApp Bot*\n\n` +
+        text: `*RelayLink Connector*\n\n` +
               `Version: 1.0.0\n` +
               `Library: @whiskeysockets/baileys\n` +
               `Prefix: ${config.commandPrefix}`

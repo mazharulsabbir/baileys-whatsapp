@@ -12,6 +12,7 @@ export type DashboardEntitlementSnapshot = {
  * Session + plan state for dashboard routes (middleware already protects `/dashboard`).
  */
 export async function getDashboardContext(): Promise<{
+  userId: string;
   email: string;
   entitlement: DashboardEntitlementSnapshot;
   hasActive: boolean;
@@ -26,6 +27,7 @@ export async function getDashboardContext(): Promise<{
     !!ent && ent.status === 'active' && ent.validUntil.getTime() > Date.now();
 
   return {
+    userId: session.user.id,
     email: session.user.email,
     entitlement: ent
       ? {

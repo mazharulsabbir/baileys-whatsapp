@@ -9,6 +9,7 @@ import {
 } from '@/lib/gateway-auth';
 import { updateOdooConfigSet } from '@/lib/odoo-gateway-credential';
 import { recordApiUsage } from '@/lib/api-usage';
+import { assertMonthlyQuotaAllowsNextCall } from '@/lib/quota';
 import { rateLimit } from '@/lib/rate-limit';
 import { normalizeToJid } from '@/lib/jid';
 import { fetchOdooMediaBuffer, rasterToJpegForWhatsApp } from '@/lib/odoo-media-fetch';
@@ -184,6 +185,11 @@ export async function dispatchGatewayRequest(req: Request): Promise<NextResponse
   const entitled = await hasActiveEntitlement(userId);
   if (!entitled) {
     return jsonError('Active subscription required', 403);
+  }
+
+  const quotaExceeded = await assertMonthlyQuotaAllowsNextCall(userId);
+  if (quotaExceeded) {
+    return quotaExceeded;
   }
 
   const rl = rateLimit(`gateway:${userId}:${action}`, 120, 60_000);

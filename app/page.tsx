@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { Hero } from '@/components/marketing/hero';
 import { StatsStrip } from '@/components/marketing/stats-strip';
 import { FeaturesSection } from '@/components/marketing/features-section';
@@ -9,8 +10,7 @@ import { CtaSection } from '@/components/marketing/cta-section';
 
 export const metadata: Metadata = {
   title: 'WhatsApp automation for teams',
-  description:
-    'Connect WhatsApp Web from your dashboard, subscribe with SSLCommerz, and integrate via REST — multi-tenant ready.',
+  description: `${PRODUCT_NAME} — connect WhatsApp Web from your dashboard, bill with SSLCommerz (BDT), and integrate via quota-aware REST APIs.`,
 };
 
 export default function HomePage() {

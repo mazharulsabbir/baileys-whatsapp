@@ -4,17 +4,19 @@ import { Providers } from './providers';
 import { Nav } from './nav';
 import { SiteFooter } from '@/components/marketing/site-footer';
 import { auth } from '@/auth';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Baileys WhatsApp SaaS',
-    template: '%s · Baileys SaaS',
+    default: PRODUCT_NAME,
+    template: `%s · ${PRODUCT_NAME}`,
   },
   description:
-    'WhatsApp Web connectivity on Baileys with SSLCommerz billing, tenant isolation, and REST APIs for integrations.',
+    'Enterprise-grade WhatsApp Web connectivity — SSLCommerz billing in BDT, tenant isolation, API quotas, and REST integrations.',
   openGraph: {
-    title: 'Baileys WhatsApp SaaS',
-    description: 'Production-ready WhatsApp automation with dashboard QR onboarding and BDT checkout.',
+    title: PRODUCT_NAME,
+    description:
+      'Production-ready WhatsApp automation: dashboard QR onboarding, quota-aware APIs, Odoo-compatible gateway.',
   },
 };
 

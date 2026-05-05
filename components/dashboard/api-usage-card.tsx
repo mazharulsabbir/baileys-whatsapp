@@ -6,6 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 type UsageSummary = {
   totals: { last24h: number; last7d: number; last30d: number };
   byDay: { day: string; messages: number; status: number }[];
+  quota: {
+    unlimited: boolean;
+    limit: number | null;
+    used: number;
+    periodKey: string;
+  };
 };
 
 export function ApiUsageCard({
@@ -64,13 +70,52 @@ export function ApiUsageCard({
         </button>
       </div>
       <p className="dashboard-muted">
-        Counts successful calls to <code>POST /messages</code> and <code>GET /status</code> with your API key.
+        Counts successful integration API calls (messages + status) and applies your plan&apos;s monthly quota in{' '}
+        <strong>UTC</strong>.
       </p>
 
       {error && <p className="error dashboard-gap">{error}</p>}
 
       {data && (
         <>
+          {!data.quota.unlimited && data.quota.limit != null && (
+            <div className="usage-quota-meter">
+              <div className="usage-quota-meter-head">
+                <span className="usage-quota-meter-label">
+                  This UTC month ({data.quota.periodKey}) — plan quota
+                </span>
+                <span className="usage-quota-meter-value">
+                  {data.quota.used.toLocaleString()} / {data.quota.limit.toLocaleString()} calls
+                </span>
+              </div>
+              <div
+                className="usage-quota-meter-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={data.quota.limit}
+                aria-valuenow={Math.min(data.quota.used, data.quota.limit)}
+                aria-label={`API quota ${data.quota.used} of ${data.quota.limit}`}
+              >
+                <div
+                  className="usage-quota-meter-fill"
+                  style={{
+                    width: `${Math.min(100, Math.round((data.quota.used / data.quota.limit) * 100))}%`,
+                  }}
+                />
+              </div>
+              <p className="dashboard-muted usage-quota-meter-hint">
+                Need more headroom? <Link href="/pricing">Upgrade on pricing</Link>. Optional emails at 75% · 85% · 95%
+                in <Link href="/dashboard/account">Account</Link>.
+              </p>
+            </div>
+          )}
+          {data.quota.unlimited && (
+            <p className="dashboard-muted usage-quota-meter-hint">
+              Your plan has <strong>no monthly API cap</strong> (fair use still applies). Billing month{' '}
+              {data.quota.periodKey} UTC.
+            </p>
+          )}
+
           <div className="usage-stat-grid">
             <div className="usage-stat">
               <span className="usage-stat-label">Last 24 hours</span>

@@ -1,3 +1,4 @@
+import { computeExtendedValidUntil } from '@/lib/entitlement-grant';
 import { prisma } from '@/lib/prisma';
 import { getPlan } from '@/lib/plans';
 import { validatePayment } from '@/lib/sslcommerz';
@@ -70,22 +71,25 @@ export async function finalizeSslPaymentFromGateway(
     return { ok: false, reason: 'validation_failed' };
   }
 
-  const planSlug = payment.planSlug ?? 'starter';
+  const planSlug = payment.planSlug ?? 'api_1k';
   const plan = getPlan(planSlug);
-  const days = plan?.durationDays ?? 30;
-  const validUntil = new Date();
-  validUntil.setDate(validUntil.getDate() + days);
 
-  await prisma.$transaction([
-    prisma.payment.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.update({
       where: { tranId: tran_id },
       data: {
         status: 'validated',
         valId: val_id,
         rawPayload: val as object,
       },
-    }),
-    prisma.entitlement.upsert({
+    });
+
+    const existing = await tx.entitlement.findUnique({
+      where: { userId: payment.userId },
+    });
+    const validUntil = computeExtendedValidUntil(existing?.validUntil ?? null, planSlug);
+
+    await tx.entitlement.upsert({
       where: { userId: payment.userId },
       create: {
         userId: payment.userId,
@@ -98,8 +102,8 @@ export async function finalizeSslPaymentFromGateway(
         status: 'active',
         validUntil,
       },
-    }),
-  ]);
+    });
+  });
 
   return { ok: true };
 }

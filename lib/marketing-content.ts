@@ -14,7 +14,7 @@ export const FEATURES = [
   {
     title: 'REST integration API',
     description:
-      'Send messages and check connection status from your CRM or ERP using scoped credentials and sensible rate limits.',
+      'Send messages and check connection status from your CRM or ERP using scoped credentials, monthly API quotas, and sensible rate limits.',
     icon: 'api' as const,
   },
   {
@@ -82,7 +82,7 @@ export const STATS = [
 export const FAQ = [
   {
     q: 'Is this the official WhatsApp API?',
-    a: 'This stack uses WhatsApp Web (Baileys) for session-based messaging. It is not the Cloud API, and you should follow WhatsApp’s terms and your own compliance requirements.',
+    a: 'This stack connects over WhatsApp Web (session-based). It is not the Cloud API — follow WhatsApp’s terms of service and your own compliance requirements.',
   },
   {
     q: 'How does billing work?',

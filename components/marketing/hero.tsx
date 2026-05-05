@@ -7,7 +7,7 @@ export function Hero() {
       <div className="section-inner hero-inner">
         <p className="eyebrow">WhatsApp automation for teams</p>
         <h1 id="hero-heading" className="hero-title">
-          Production-ready WhatsApp SaaS on Baileys
+          Production-ready WhatsApp connectivity for modern teams
         </h1>
         <p className="hero-lead">
           Register, pay with SSLCommerz, and connect WhatsApp Web from your dashboard — with tenant isolation and an API

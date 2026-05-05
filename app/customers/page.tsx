@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { CustomersSection } from '@/components/marketing/customers-section';
 import { CtaSection } from '@/components/marketing/cta-section';
 
 export const metadata: Metadata = {
   title: 'Customers',
-  description: 'Teams using WhatsApp automation with Baileys SaaS — retail, logistics, healthcare, and more.',
+  description: `Teams using WhatsApp automation with ${PRODUCT_NAME} — retail, logistics, healthcare, and more.`,
 };
 
 export default function CustomersPage() {
