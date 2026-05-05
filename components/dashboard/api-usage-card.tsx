@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 type UsageSummary = {
@@ -7,7 +8,14 @@ type UsageSummary = {
   byDay: { day: string; messages: number; status: number }[];
 };
 
-export function ApiUsageCard({ enabled }: { enabled: boolean }) {
+export function ApiUsageCard({
+  enabled,
+  showWhenDisabled = false,
+}: {
+  enabled: boolean;
+  /** When true, show an empty-state card if there is no active plan instead of rendering nothing. */
+  showWhenDisabled?: boolean;
+}) {
   const [data, setData] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +41,15 @@ export function ApiUsageCard({ enabled }: { enabled: boolean }) {
   }, [enabled, load]);
 
   if (!enabled) {
-    return null;
+    if (!showWhenDisabled) return null;
+    return (
+      <section className="card dashboard-card">
+        <h2>API usage</h2>
+        <p className="dashboard-muted" style={{ margin: 0 }}>
+          Subscribe to a plan to record and display API request metrics. <Link href="/pricing">View plans</Link>.
+        </p>
+      </section>
+    );
   }
 
   const maxBar =

@@ -3,6 +3,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { Nav } from './nav';
 import { SiteFooter } from '@/components/marketing/site-footer';
+import { auth } from '@/auth';
 
 export const metadata: Metadata = {
   title: {
@@ -17,7 +18,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+
   return (
     <html lang="en">
       <body>
@@ -25,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="site-root">
             <Nav />
             <main className="site-main">{children}</main>
-            <SiteFooter />
+            {!session && <SiteFooter />}
           </div>
         </Providers>
       </body>
