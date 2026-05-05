@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasActiveEntitlement } from '@/lib/entitlement';
 import { getExistingService, getAllServices } from '@/lib/whatsapp-registry';
+import { isDebugApiAllowed } from '@/lib/debug-api';
 import fs from 'fs';
 import path from 'path';
 
@@ -9,131 +10,129 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Debug endpoint to troubleshoot WhatsApp connection issues
+ * Debug endpoint to troubleshoot WhatsApp connection issues.
+ * Disabled in production unless `DEBUG_API_ENABLED=true`.
  * GET /api/debug/whatsapp-status
  */
 export async function GET() {
-  const session = await auth();
+  if (!isDebugApiAllowed()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
-  const debug: Record<string, any> = {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+
+  const debug: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     authentication: {
-      authenticated: !!session?.user,
-      userId: session?.user?.id || null,
-      email: session?.user?.email || null
+      authenticated: true,
+      userId,
+      email: session.user.email ?? null,
     },
     entitlement: {
       checked: false,
       hasActive: false,
-      error: null as string | null
+      error: null as string | null,
     },
     whatsappService: {
       exists: false,
       connected: false,
       hasQr: false,
       qrValue: null as string | null,
-      socketInitialized: false
+      socketInitialized: false,
     },
     globalRegistry: {
+      /** Total in-memory slots (all tenants); never list other tenants' ids. */
       totalServices: 0,
       activeConnections: 0,
-      serviceIds: [] as string[]
+      thisTenantRegistered: false,
     },
     sessionFiles: {
       exists: false,
       path: '',
-      files: [] as string[]
+      files: [] as string[],
     },
-    recommendations: [] as string[]
+    recommendations: [] as string[],
   };
 
-  // Check authentication
-  if (!session?.user?.id) {
-    debug.recommendations.push('User is not authenticated. Please login first.');
-    return NextResponse.json(debug, { status: 200 });
-  }
-
-  const userId = session.user.id;
-
-  // Check entitlement
   try {
     const entitled = await hasActiveEntitlement(userId);
-    debug.entitlement.checked = true;
-    debug.entitlement.hasActive = entitled;
+    debug.entitlement = { checked: true, hasActive: entitled, error: null };
 
     if (!entitled) {
-      debug.recommendations.push('No active subscription found. Add an entitlement to the database.');
-      debug.recommendations.push(`SQL: INSERT INTO "Entitlement" ("userId", "planSlug", status, "validUntil", "createdAt", "updatedAt") VALUES ('${userId}', 'premium', 'active', NOW() + INTERVAL '30 days', NOW(), NOW()) ON CONFLICT ("userId") DO UPDATE SET status = 'active', "validUntil" = NOW() + INTERVAL '30 days';`);
+      (debug.recommendations as string[]).push(
+        'No active subscription. Complete checkout or extend entitlement from the dashboard.'
+      );
     }
   } catch (error) {
-    debug.entitlement.error = error instanceof Error ? error.message : 'Unknown error';
-    debug.recommendations.push('Failed to check entitlement. Database may be unavailable.');
+    debug.entitlement = {
+      checked: true,
+      hasActive: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+    (debug.recommendations as string[]).push('Failed to check entitlement. Database may be unavailable.');
   }
 
-  // Check WhatsApp service for this user
   const svc = getExistingService(userId);
   if (svc) {
-    debug.whatsappService.exists = true;
-    debug.whatsappService.connected = svc.isConnected();
-    debug.whatsappService.socketInitialized = !!svc.getSocket();
-
+    const ws = debug.whatsappService as Record<string, unknown>;
+    ws.exists = true;
+    ws.connected = svc.isConnected();
+    ws.socketInitialized = Boolean(svc.getSocket());
     const qr = svc.getLatestQr();
-    debug.whatsappService.hasQr = !!qr;
-    debug.whatsappService.qrValue = qr ? qr.substring(0, 50) + '...' : null;
+    ws.hasQr = Boolean(qr);
+    ws.qrValue = qr ? `${qr.substring(0, 50)}...` : null;
 
-    if (!debug.whatsappService.connected && !debug.whatsappService.hasQr) {
-      debug.recommendations.push('Service exists but no QR code. Click "Connect" button or wait for QR to be generated.');
+    if (!svc.isConnected() && !qr) {
+      (debug.recommendations as string[]).push(
+        'Service exists but no QR code. Click "Connect" or wait for QR generation.'
+      );
     }
-    if (debug.whatsappService.connected) {
-      debug.recommendations.push('WhatsApp is already connected! No QR needed.');
+    if (svc.isConnected()) {
+      (debug.recommendations as string[]).push('WhatsApp is already connected.');
     }
   } else {
-    debug.whatsappService.exists = false;
-    debug.recommendations.push('No WhatsApp service found for this user. Click "Connect" button to initialize.');
+    (debug.recommendations as string[]).push('No in-memory service for this tenant. Use Connect in the dashboard.');
   }
 
-  // Check global registry
   const allServices = getAllServices();
-  debug.globalRegistry.totalServices = allServices.size;
-  debug.globalRegistry.serviceIds = Array.from(allServices.keys());
-  debug.globalRegistry.activeConnections = Array.from(allServices.values()).filter(
-    s => s.isConnected()
-  ).length;
+  const gr = debug.globalRegistry as Record<string, unknown>;
+  gr.totalServices = allServices.size;
+  gr.activeConnections = Array.from(allServices.values()).filter((s) => s.isConnected()).length;
+  gr.thisTenantRegistered = allServices.has(userId);
 
-  // Check session files
   const sessionRoot = process.env.WHATSAPP_SESSION_ROOT || path.join(process.cwd(), 'sessions');
   const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
   const sessionPath = path.join(sessionRoot, safeId);
-
-  debug.sessionFiles.path = sessionPath;
+  const sf = debug.sessionFiles as Record<string, unknown>;
+  sf.path = sessionPath;
 
   try {
     if (fs.existsSync(sessionPath)) {
-      debug.sessionFiles.exists = true;
-      debug.sessionFiles.files = fs.readdirSync(sessionPath);
-
-      if (debug.sessionFiles.files.length > 0) {
-        debug.recommendations.push('Session files exist. WhatsApp should remember previous pairing.');
+      sf.exists = true;
+      sf.files = fs.readdirSync(sessionPath);
+      if ((sf.files as string[]).length > 0) {
+        (debug.recommendations as string[]).push('Session files on disk — prior pairing may resume after connect.');
       }
     } else {
-      debug.sessionFiles.exists = false;
-      debug.recommendations.push('No session files found. This is expected for first-time setup.');
+      sf.exists = false;
+      (debug.recommendations as string[]).push('No session directory yet — expected on first setup.');
     }
-  } catch (error) {
-    debug.sessionFiles.exists = false;
+  } catch {
+    sf.exists = false;
   }
 
-  // Add general recommendations
-  if (debug.authentication.authenticated &&
-      debug.entitlement.hasActive &&
-      !debug.whatsappService.exists) {
-    debug.recommendations.push('✅ Ready to connect! Click the "Connect / refresh QR" button in the dashboard.');
+  const ent = debug.entitlement as { hasActive?: boolean };
+  const ws = debug.whatsappService as { exists?: boolean; connected?: boolean; hasQr?: boolean };
+  if (ent.hasActive && !ws.exists) {
+    (debug.recommendations as string[]).push('Ready to connect from the WhatsApp dashboard tab.');
   }
-
-  if (debug.whatsappService.exists &&
-      !debug.whatsappService.connected &&
-      debug.whatsappService.hasQr) {
-    debug.recommendations.push('✅ QR code is ready! Scan it with WhatsApp app on your phone.');
+  if (ws.exists && !ws.connected && ws.hasQr) {
+    (debug.recommendations as string[]).push('QR present — scan from the phone\'s Linked devices.');
   }
 
   return NextResponse.json(debug, { status: 200 });

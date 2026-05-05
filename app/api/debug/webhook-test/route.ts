@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { postAcuxPayloadWithRetries } from '@/lib/odoo-webhook-delivery';
+import { isDebugApiAllowed } from '@/lib/debug-api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,10 @@ export const dynamic = 'force-dynamic';
  * POST /api/debug/webhook-test
  */
 export async function POST(req: Request) {
+  if (!isDebugApiAllowed()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
